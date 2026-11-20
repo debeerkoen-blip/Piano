@@ -481,16 +481,15 @@
       <span class="groupLabel">Legenda</span>
       <div class="legend">
         <i style="background:#ec8f4c"></i>C-noten &nbsp;
-        <i style="background:#2b2640"></i>overige noten &nbsp;
-        R1 t/m R5 = rechter hand, vinger 1 t/m 5
+        <i style="background:#2b2640"></i>overige noten
       </div>
       <div class="legend">
         <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
         <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
       </div>
       <div class="legend" id="handLegend" hidden>
-        De onderste notenbalk (links, L1 t/m L5) is de linkerhand: die staat er alleen bij
-        als voorbeeld en wordt nog niet door de microfoon beoordeeld.
+        De onderste notenbalk (links) is de linkerhand: die staat er alleen bij als
+        voorbeeld en wordt nog niet door de microfoon beoordeeld.
       </div>
     </div>
   </div>
@@ -1250,10 +1249,6 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
         el('path', { d, fill: stemColor, opacity: noteOpacity }, svgEl);
       }
     }
-
-    const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + S(26) : yOfFn(minStep) + S(26);
-    const finger = el('text', { x, y: fingerY, 'font-size':S(13), 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
-    finger.textContent = handPrefix + n.finger;
   }
 
   const rightAcc = { measure: -1, shown: {} };

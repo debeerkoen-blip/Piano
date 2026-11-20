@@ -17,7 +17,10 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   soepeler van: `onHeard()` rekent nog steeds met het moment waarop de toon voor het
   eerst gehoord werd, niet met het latere bevestigde moment.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
-- Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+- Notenbalk: SVG. C-noten zijn oranje. Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+  Geen vingerzetting meer onder elke noot (R1 t/m R5 / L1 t/m L5 stonden er te druk bij); de
+  vingerzetting-data (`fingers`) blijft wel bestaan en wordt nog gebruikt in de feedbacktekst
+  ("Speel: F#5 met R2", "Gemist: ...", enz.) en in de selectievakjes bij "Lied toevoegen".
   De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
   `STAFF_SCALE` (1,3) in `drawGrandStaff`, via de helper `S(v) = v * STAFF_SCALE`. Er zat te
   veel witruimte in de kaart t.o.v. hoe klein de notatie oogde; dit vergroot alles in verhouding
