@@ -949,7 +949,8 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       fill: hollow ? '#fff' : fill,
       opacity: noteOpacity,
       stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
-      'stroke-width': highlight !== 'none' ? 2.5 : 1.8
+      'stroke-width': highlight !== 'none' ? 2.5 : 1.8,
+      'data-note-index': i, 'data-hand': handPrefix
     }, svgEl);
 
     if (hasStem) {
@@ -1005,6 +1006,34 @@ function render() {
   }
 }
 
+// Korte flits bij een juist geraakte noot, zoals in ritmespellen als Guitar Hero:
+// de noot zelf veert even op en een ring dijt uit en vervaagt eromheen. Gemiste of
+// nog niet gespeelde noten blijven gewoon staan (geen animatie, zie drawNote's
+// highlight-logica voor hun kleur). Werkt los van render()/drawGrandStaff: die
+// hertekent de hele notenbalk bij elke noot, dus deze animatie wordt apart
+// getriggerd nadat de notenbalk opnieuw getekend is, op precies die ene noot.
+function animateNoteHit(i) {
+  const notehead = document.querySelector(`#staff ellipse[data-note-index="${i}"][data-hand="R"]`);
+  if (!notehead) return;
+
+  notehead.style.transformBox = 'fill-box';
+  notehead.style.transformOrigin = 'center';
+  notehead.animate(
+    [{ transform: 'scale(1)' }, { transform: 'scale(1.6)', offset: 0.3 }, { transform: 'scale(1)' }],
+    { duration: 380, easing: 'ease-out' }
+  );
+
+  const cx = notehead.getAttribute('cx'), cy = notehead.getAttribute('cy');
+  const ring = el('circle', { cx, cy, r: 8, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3, opacity: 0.9 });
+  ring.style.transformBox = 'fill-box';
+  ring.style.transformOrigin = 'center';
+  const anim = ring.animate(
+    [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(3.2)', opacity: 0 }],
+    { duration: 450, easing: 'ease-out' }
+  );
+  anim.onfinish = () => ring.remove();
+}
+
 // Schuift de notenbalk automatisch mee: de huidige noot komt links in beeld,
 // met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
 // noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
@@ -1032,6 +1061,7 @@ function onHeard(midi, tEvent) {
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
     if (pitchOk) {
+      const hitIdx = idx;
       const pitchPts = exactOctave ? 10 : 6;
       xp += pitchPts;
       streak++;
@@ -1040,8 +1070,9 @@ function onHeard(midi, tEvent) {
       idx++;
       skipRests();
       setFeedback(`Goed! +${pitchPts} toon${exactOctave ? '' : ' (andere octaaf telt ook)'}${streakNote}`, 'ok');
+      render();
+      animateNoteHit(hitIdx);
       if (idx === notes.length) finish();
-      else render();
     } else {
       wrongs++;
       streak = 0;
@@ -1076,6 +1107,7 @@ function onHeard(midi, tEvent) {
   streak++;
   let streakNote = '';
   if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
+  const hitIdx = idx;
   noteResults[idx] = 'hit';
   idx++;
   skipRests();
@@ -1084,6 +1116,7 @@ function onHeard(midi, tEvent) {
 
   if (idx === notes.length) stopPlay(true);
   else { render(); updateStats(); }
+  animateNoteHit(hitIdx);
 }
 
 function finish() {
