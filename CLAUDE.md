@@ -20,6 +20,14 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tijdvenster zelf al korter is dan die bevestigingstijd). De score zelf wordt er niet
   soepeler van: `onHeard()` rekent nog steeds met het moment waarop de toon voor het
   eerst gehoord werd, niet met het latere bevestigde moment.
+- `passedIdx` hoort bij `idx`, maar loopt los daarvan mee op basis van alleen de rode
+  speelstreep (geen tijdvenster, geen `MISS_GRACE_MS`). `idx` mag dankzij het niveau-venster
+  (vooral ruim bij Beginner) en `MISS_GRACE_MS` een stuk achterblijven: dat is bewust, voor de
+  score. Maar zonder `passedIdx` kleurden noten op de notenbalk pas lang nadat de streep ze al
+  voorbij was, wat verwarrend oogde. `passedIdx` bepaalt nu de kleur (rood zodra de streep een
+  noot voorbij is, zonder venster), `noteResults` wint daar altijd van: speel je 'm alsnog op
+  tijd (binnen het venster), dan kleurt 'ie alsnog groen in plaats van rood. `idx` blijft de
+  echte score-pointer en bepaalt (ongewijzigd) wat het pianotoetsenbord en "Speel: ..." tonen.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
   De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
