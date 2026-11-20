@@ -93,10 +93,10 @@
   .statLabel { font-size:12px; color:var(--muted); }
 
   /* ---------- Icoonknoppen ---------- */
-  .icon-btn-wrap { position:relative; display:inline-flex; }
+  .icon-btn-wrap { position:relative; display:inline-flex; flex-shrink:0; }
   .icon-btn {
     display:inline-flex; align-items:center; justify-content:center;
-    width:44px; height:44px; padding:0; border-radius:var(--radius-m);
+    width:44px; height:44px; padding:0; border-radius:var(--radius-m); flex-shrink:0;
     background:var(--lavender); color:var(--ink); border:1px solid transparent; cursor:pointer;
   }
   .icon-btn.btn-ghost { background:var(--surface); border-color:var(--border); }
@@ -104,6 +104,9 @@
   .icon-btn:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .icon-btn[aria-expanded="true"] { background:var(--accent-ring); color:#fff; }
   .icon-btn.warnBtn { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.2); }
+  /* Zachte "let op", geen harde foutmelding: dezelfde amberkleur als warnBtn
+     (het conceptlabel), in plaats van het alarmrood van .bad. */
+  .icon-btn.micOffHint { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.35); }
   /* Zonder deze regel wint "display:inline-flex" hierboven van de browser-eigen
      "[hidden] { display:none }" bij gelijke specificiteit, en blijft een
      verborgen icoonknop (zoals draftBadge) gewoon zichtbaar. */
@@ -117,14 +120,45 @@
   }
   .icon-btn:hover + .tooltip, .icon-btn:focus-visible + .tooltip { opacity:1; }
 
+  .tempoPopover {
+    position:absolute; top:calc(100% + 8px); right:0;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+    box-shadow:0 4px 16px rgba(43,38,64,.18); padding:var(--space-3) var(--space-4);
+    width:200px; max-width:calc(100vw - 2 * var(--space-4));
+    z-index:25; display:flex; flex-direction:column; gap:var(--space-2);
+  }
+  .tempoPopover[hidden] { display:none; }
+
   /* ---------- Notenbalk-kaart ---------- */
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
-  .staffToolbar { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-4); }
+  /* Alle icoonknoppen in één rij: bij te weinig breedte scrolt de werkbalk zelf
+     horizontaal, net als de notenbalk, in plaats van naar een tweede regel te
+     springen. */
+  .staffToolbar {
+    display:flex; flex-wrap:nowrap; gap:var(--space-2); align-items:center;
+    margin-bottom:var(--space-4); overflow-x:auto; -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+    padding-bottom:var(--space-1);
+  }
+  .staffToolbar::-webkit-scrollbar { height:6px; }
+  .staffToolbar::-webkit-scrollbar-track { background:transparent; }
+  .staffToolbar::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
   .toolbarSpacer { flex:1 1 auto; min-width:var(--space-4); }
   .staffWrap {
-    overflow-x:scroll; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
+    position:relative; overflow-x:scroll; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
     scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
   }
+  /* Zachte lay-over met het aftellen, boven op de notenbalk. position:absolute
+     binnen de scrollende .staffWrap blijft vast op het zichtbare stuk staan,
+     scrollt niet met de notenbalk mee. pointer-events:none zodat je er gewoon
+     doorheen kan scrollen/klikken. */
+  .countInOverlay {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(251,250,247,.82); border-radius:var(--radius-s); pointer-events:none;
+    opacity:0; transition:opacity .15s ease; z-index:5;
+  }
+  .countInOverlay.show { opacity:1; }
+  .countInNumber { font-size:72px; font-weight:800; color:var(--accent-ring); }
   .staffWrap::-webkit-scrollbar { height:8px; }
   .staffWrap::-webkit-scrollbar-track { background:transparent; }
   .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
@@ -133,12 +167,34 @@
      van id, want een opgeslagen-liedjeslijst kan meerdere voorbeeldbalkjes
      tonen. */
   #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
-  .playLabel { font-size:16px; color:var(--muted); text-align:center; margin:var(--space-2) 0 0; }
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
 
-  .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
-  .progress div { height:100%; background:var(--ok-text); width:0; transition: width .3s; }
+  /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
+     moet spelen. Alle 88 toetsen schalen mee naar de beschikbare breedte, geen
+     scroll/sprong. Alleen genoeg ruimte op een telefoon in liggende stand of
+     een breder scherm (zie media query onderaan), anders passen 88 toetsen
+     niet leesbaar naast elkaar en blijft 'ie verborgen.
+     Vastgezet onderaan het scherm (position:fixed) in plaats van gewoon
+     ergens midden in de meescrollende kaart: op een telefoon in liggende
+     stand is de kaart vaak hoger dan het scherm, dus zonder dit zou je tijdens
+     het spelen zelf moeten scrollen om 'm te kunnen zien, en leek het net of
+     'ie "bewoog" doordat zijn plek op het scherm niet stabiel was. Vast
+     onderaan betekent: altijd zichtbaar, altijd exact dezelfde plek.
+     main krijgt evenveel extra padding-bottom gereserveerd, anders schuift
+     deze balk over de feedbacktekst/legenda heen. */
+  .keyboardWrap { display:none; }
+  #keyboard { display:block; width:100%; height:auto; }
+  @media (orientation: landscape), (min-width: 700px) {
+    .keyboardWrap {
+      display:block; position:fixed; left:0; right:0; bottom:0; z-index:15;
+      margin:0; border-radius:0; background:var(--surface); border-top:1px solid var(--border);
+      box-shadow:0 -6px 16px rgba(43,38,64,.12);
+      padding:var(--space-2) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
+    }
+    #keyboard { height:64px; width:auto; max-width:100%; margin:0 auto; }
+    main { padding-bottom:108px; }
+  }
   .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
 
@@ -246,6 +302,11 @@
   .noteRow .rowNum { font-size:12px; color:var(--muted); width:20px; }
   .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:var(--space-1); }
   .noteRow .removeRow { margin-left:auto; min-height:30px; padding:0 var(--space-3); background:#ffe0e6; color:var(--bad-text); font-size:13px; }
+  .noteRow .pitchesWrap { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .noteRow .pitchGroup { display:flex; gap:4px; }
+  .noteRow .chordPlus { font-weight:700; color:var(--muted); padding:0 2px; }
+  .noteRow .removePitch { min-height:24px; min-width:24px; padding:0; font-size:11px; background:#ffe0e6; color:var(--bad-text); border-radius:999px; }
+  .noteRow .addPitch { min-height:30px; padding:0 var(--space-2); font-size:13px; background:#e8e4fb; color:var(--ink); border-radius:var(--radius-s); }
   .rowButtons { display:flex; gap:var(--space-2); flex-wrap:wrap; }
   .previewStaff { background:#fbfaf7; border-radius:var(--radius-m); border:1px solid var(--border); }
   .customSong { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--border); font-size:14px; }
@@ -280,9 +341,10 @@
     .stat b { font-size: 18px; }
     .card { padding: var(--space-2) var(--space-3); }
     .staffToolbar { margin-bottom: var(--space-2); }
-    #staff { width: auto; min-width: 0; height: min(42vh, 220px); }
-    .playLabel { font-size: 13px; margin-top: var(--space-1); }
-    .progress { margin-top: var(--space-2); height: 6px; }
+    #staff { width: auto; min-width: 0; height: min(48vh, 250px); }
+    .keyboardWrap { padding: var(--space-1) var(--space-3) max(var(--space-1), env(safe-area-inset-bottom)); }
+    #keyboard { height: 48px; }
+    main { padding-bottom: 76px; }
     .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
   }
 </style>
@@ -341,6 +403,13 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21h6l-1.5-16h-3z"/><path d="M12 7v10"/><circle cx="14.4" cy="12.5" r="1.1" fill="currentColor" stroke="none"/></svg>
         </button>
         <span class="tooltip" id="tip-metronome" role="tooltip">Metronoom aan</span>
+        <div class="tempoPopover" id="tempoPopover" hidden>
+          <span class="groupLabel">Tempo</span>
+          <div class="groupRow">
+            <input type="range" id="tempoPopoverSlider" min="50" max="150" step="5" value="100" aria-label="Afspeeltempo, percentage van het liedtempo">
+            <span class="pill" id="tempoPopoverValue">100%</span>
+          </div>
+        </div>
       </span>
 
       <span class="toolbarSpacer" aria-hidden="true"></span>
@@ -361,9 +430,11 @@
 
     <div class="staffWrap">
       <svg id="staff" viewBox="0 0 600 240"></svg>
+      <div class="countInOverlay" id="countInOverlay"><span class="countInNumber" id="countInNumber"></span></div>
     </div>
-    <p class="playLabel" id="playLabel"></p>
-    <div class="progress"><div id="bar"></div></div>
+    <div class="keyboardWrap">
+      <svg id="keyboard"></svg>
+    </div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
   </div>
 
@@ -410,8 +481,8 @@
     <div class="controlGroup">
       <span class="groupLabel">Niveau</span>
       <select id="difficulty">
-        <option value="beginner">Beginner</option>
-        <option value="medior" selected>Medior</option>
+        <option value="beginner" selected>Beginner</option>
+        <option value="medior">Medior</option>
         <option value="advanced">Advanced</option>
       </select>
     </div>
@@ -546,6 +617,11 @@
 // bpm: tempo voor "Speel af".
 // durations: optioneel, lengte per noot/rust in tellen (1 = kwart, 0.5 = achtste, 1.5 = kwart
 // gestippeld, enz.). Zonder durations duurt elke noot of rust één tel, zoals voorheen.
+// Akkoorden: op een tel staat normaal één notenaam (of null voor een rust), maar het mag ook
+// een lijst van notenamen zijn, bv. ['C3','E3','G3'], voor meerdere toonhoogtes tegelijk.
+// Alleen de linkerhand (left.notes) ondersteunt dit: die wordt getekend en klinkt mee bij
+// "Speel af", maar wordt (net als de rest van de linkerhand) niet door de microfoon
+// beoordeeld, die maar één toon tegelijk herkent. De rechterhand blijft daarom één toon per tel.
 // beatsPerMeasure: aantal tellen per maat, voor de maatstrepen in de notenbalk.
 // draft: true betekent dat de noten, vingerzetting en maatindeling nog niet zijn gecontroleerd.
 const SONGS = [
@@ -560,13 +636,139 @@ const SONGS = [
   },
   {
     id: 'gymno',
-    title: 'Gymnopédie nr. 1 (Satie), eerste frase',
-    bpm: 60,
-    // Maatsoort nog niet tegen de partituur gecontroleerd, zie draft-waarschuwing.
-    beatsPerMeasure: 4,
+    title: 'Gymnopédie nr. 1 (Satie)',
+    bpm: 52,
+    beatsPerMeasure: 3,
     draft: true,
-    notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
-    fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
+    // Overgetypt van drie foto's van een MuseScore-weergave (D-majeur, 2 kruizen,
+    // 3/4, "Lent et douloureux"), maat 1 t/m 78 (hele stuk, eindigt op de dubbele
+    // maatstreep). Dit is een beste-poging transcriptie, geen zekere bron:
+    // - De linkerhand is in de bron op elke tel 1 een akkoord (kwartrust + akkoord
+    //   dat de rest van de maat klinkt), op een lage baston daaronder. De app kent
+    //   geen akkoorden, dus is per maat teruggebracht tot die ene baston (de noot
+    //   op de hulplijn onder de notenbalk), als gestippelde halve noot.
+    // - Het siertje (een "turn") boven maat 26 en 31 is niet in de noten verwerkt.
+    // - Of sommige groepjes van 3 noten achtste noten of kwartnoten zijn kon niet
+    //   met zekerheid uit de foto's afgelezen worden; hier als kwartnoten genomen.
+    // - Vingerzetting staat nergens in de bron en is hier zelf bedacht, niet
+    //   gecontroleerd.
+    // Onzeker (controleer tegen IMSLP voor dit serieus geoefend wordt):
+    // - Herstel- en kruistekens rond maat 22-24, 27-29, 31-32, 52-54, 61-63,
+    //   66-68 en 71-76: de app houdt een herstelteken alleen binnen de maat aan
+    //   (notatieregel), maar of de precieze noten C/F zijn (en niet een andere
+    //   toonhoogte) kon niet op de pixel af gecontroleerd worden.
+    // - Maat 37-39: de bron laat hier een paar samengebalkte/akkoordachtige
+    //   notenkoppen in de rechterhand zien; vereenvoudigd tot één melodienoot
+    //   per maat.
+    // - Maat 65 en 70: notenwaarde (halve vs. gestippelde halve noot) onzeker,
+    //   hier als gestippelde halve genomen.
+    // - Alle baston-toonhoogtes in de linkerhand: afgelezen op hulplijnen onder de
+    //   bassleutel, lastig op de foto; harmonische richting (G/D/A versus C/F bij
+    //   de herstelteken-maten) is aannemelijk maar niet zeker.
+    notes: [
+      // m1-5
+      null,null,null,null,  null,'F#5','A5',
+      // m6-10
+      'B5','A5','G5',  'F#5','E5','D5',  'E5',  'F#5',  'D5',
+      // m11-15
+      'D5',  'D5',  null,'E5','F#5',  'G5','F#5','E5',  'D5','C#5','B4',
+      // m16-20
+      'A4',  'B4',  'C#5',  'D5',  'D5',
+      // m21-25
+      'D5',  'C5','B4','A4',  'G4','F4','E4',  'D4','E4','F#4',  'G4',
+      // m26-30
+      'A4',  'B4','A4','F4',  'G4','F4','E4',  'D4','C4','B3',  'A3',
+      // m31-35
+      'B3',  'C4',  'D4','E4','F#4',  'G4','F#4','E4',  'D4',
+      // m36-40
+      'E4','F#4','G4',  'A4','B4','C5',  'D5',  'C5',  null,
+      // m41-45
+      null,null,null,  null,'D5','F#5',  'G5','F#5','E5',
+      // m46-51
+      'D5','C#5','B4',  'A4',  'B4',  'B4',  'B4',  'B4',
+      // m52-56
+      null,'C5','D5',  'E5','D5','C5',  'B4','A4','G4',  'F#4',  'G4',
+      // m57-62
+      'A4',  'A4',  'A4',  'A4',  'B4','C5','D5',  'E5','F5','G5',
+      // m63-67
+      'A5','G5','F5',  'E5',  'E5',  'D5','C5','B4',  'A4','B4','C5',
+      // m68-73
+      'D5','C5','B4',  'A4',  'G4',  'A4',  'B4',  'C5','B4','A4',
+      // m74-78
+      'G4','F4','E4',  'D4','C4','B3',  'C4',  'D4',  'D4'
+    ],
+    durations: [
+      3,3,3,3,  1,1,1,
+      1,1,1,  1,1,1,  3,  3,  3,
+      3,  3,  1,1,1,  1,1,1,  1,1,1,
+      3,  3,  3,  3,  3,
+      3,  1,1,1,  1,1,1,  1,1,1,  3,
+      3,  1,1,1,  1,1,1,  1,1,1,  3,
+      3,  3,  1,1,1,  1,1,1,  3,
+      1,1,1,  1,1,1,  3,  3,  3,
+      3,3,3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  3,  3,  3,
+      1,1,1,  1,1,1,  1,1,1,  3,  3,
+      3,  3,  3,  3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  3,  3,  1,1,1,
+      1,1,1,  1,1,1,  3,  3,  3
+    ],
+    fingers: [
+      null,null,null,null,  null,2,4,
+      3,2,1,  3,2,1,  3,  3,  3,
+      3,  3,  null,2,3,  3,2,1,  3,2,1,
+      3,  3,  3,  3,  3,
+      3,  3,2,1,  3,2,1,  1,2,3,  3,
+      3,  3,2,1,  3,2,1,  3,2,1,  3,
+      3,  3,  1,2,3,  3,2,1,  3,
+      1,2,3,  1,2,3,  3,  3,  null,
+      null,null,null,  null,2,3,  3,2,1,
+      3,2,1,  3,  3,  3,  3,  3,
+      null,2,3,  3,2,1,  3,2,1,  3,  3,
+      3,  3,  3,  3,  1,2,3,  1,2,3,
+      3,2,1,  3,  3,  3,2,1,  1,2,3,
+      3,2,1,  3,  3,  3,  3,  3,2,1,
+      3,2,1,  3,2,1,  3,  3,  3
+    ],
+    // Linkerhand: per maat de baston (zie uitleg hierboven). Klinkt mee bij
+    // "Speel af" met geluid aan; wordt (nog) niet beoordeeld door de microfoon.
+    left: {
+      notes: [
+        'G2','G2','G2','G2','G2',
+        'D3','A2','D3','G2','D3',
+        'G2','D3','G2','D3','A2',
+        'D3','G2','D3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'G2','C3','F2','C3','F2',
+        'G2','C3','G2','D3','G2',
+        'D3','G2','D3','C3','F2',
+        'G2','D3','G2','D3','G2',
+        'D3','G2','D3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'G2','D3','G2','D3','G2',
+        'C3','F2','C3','F2','G2',
+        'C3','F2','C3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'C3','G2','D3'
+      ],
+      durations: [
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3
+      ],
+      fingers: [
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5
+      ]
+    }
   },
   {
     id: 'sinterklaas-deur',
@@ -638,11 +840,11 @@ const MISS_GRACE_MS = 300;
 // perfectWindow: hoe dicht bij de tel voor de volle timingbonus.
 // octaveStrict: true betekent dat alleen de exacte octaaf telt, niet elke octaaf van dezelfde toon.
 const DIFFICULTIES = {
-  beginner: { label: 'Beginner', window: 0.75, perfectWindow: 0.35, octaveStrict: false },
+  beginner: { label: 'Beginner', window: 2,    perfectWindow: 0.35, octaveStrict: false },
   medior:   { label: 'Medior',   window: 0.5,  perfectWindow: 0.15, octaveStrict: false },
   advanced: { label: 'Advanced', window: 0.25, perfectWindow: 0.08, octaveStrict: true }
 };
-let difficulty = DIFFICULTIES.medior;
+let difficulty = DIFFICULTIES.beginner;
 
 // ---------- Notenhulpjes ----------
 const LETTERS = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
@@ -671,28 +873,130 @@ function el(tag, attrs, parent = staff) {
   parent.appendChild(e);
   return e;
 }
-const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
-const yOfBass = step => 330 - (step - 18) * 10; // G2 zit op de onderste lijn
-const xOf = i => 110 + i * 34;
+
+// ---------- Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger
+// je nu moet spelen, in plaats van de voortgangsbalk. ----------
+const PIANO_LOW_MIDI = 21, PIANO_HIGH_MIDI = 108; // A0 .. C8
+const WHITE_PITCH_CLASSES = new Set([0, 2, 4, 5, 7, 9, 11]); // C D E F G A B
+function isWhiteKeyMidi(m) { return WHITE_PITCH_CLASSES.has(((m % 12) + 12) % 12); }
+
+const KEY_WHITE_W = 32, KEY_WHITE_H = 110;
+const KEY_BLACK_W = 19, KEY_BLACK_H = 68;
+
+// Elke toets z'n x-positie: witte toetsen gewoon op een rij, zwarte toetsen op de
+// grens tussen de vorige en volgende witte toets (een gangbare vereenvoudiging
+// voor een webklavier, geen millimeter-precieze pianobouw).
+function buildKeyboardLayout() {
+  const keys = [];
+  let whiteIndex = 0;
+  for (let m = PIANO_LOW_MIDI; m <= PIANO_HIGH_MIDI; m++) {
+    if (isWhiteKeyMidi(m)) {
+      keys.push({ midi: m, white: true, x: whiteIndex * KEY_WHITE_W });
+      whiteIndex++;
+    } else {
+      keys.push({ midi: m, white: false, x: whiteIndex * KEY_WHITE_W - KEY_BLACK_W / 2 });
+    }
+  }
+  return { keys, whiteCount: whiteIndex };
+}
+const { keys: KEYBOARD_LAYOUT, whiteCount: KEYBOARD_WHITE_COUNT } = buildKeyboardLayout();
+const KEYBOARD_SVG_WIDTH = KEYBOARD_WHITE_COUNT * KEY_WHITE_W;
+
+// Tekent alle 88 toetsen opnieuw en licht de huidige noot (rechterhand, degene
+// die je moet spelen) op met de vingerzetting erop, net als de paarse "huidige
+// noot"-markering op de notenbalk. Geen highlight als het lied klaar is of nog
+// niet geladen.
+// De linkerhand-noot die "nu" hoort, gekoppeld aan waar de rechterhand (notes[idx])
+// op dit moment is: geen eigen klok nodig, dus werkt ook gewoon in oefenmodus.
+// Een akkoord (alleen linkerhand) licht al z'n toonhoogtes tegelijk op.
+function currentContextMidis() {
+  if (!contextNotes.length) return [];
+  const refStart = idx < notes.length ? notes[idx].start : (notes.length ? notes[notes.length - 1].start : null);
+  if (refStart === null) return [];
+  const n = contextNotes.find(cn => !cn.rest && refStart >= cn.start && refStart < cn.start + cn.dur);
+  if (!n) return [];
+  return n.chord ? n.pitches.map(p => p.midi) : [n.midi];
+}
+
+function renderKeyboard() {
+  const svgEl = document.getElementById('keyboard');
+  svgEl.innerHTML = '';
+  svgEl.setAttribute('viewBox', `0 0 ${KEYBOARD_SVG_WIDTH} ${KEY_WHITE_H}`);
+
+  const current = idx < notes.length ? notes[idx] : null;
+  const currentMidi = current ? current.midi : null;
+  const contextMidis = currentContextMidis();
+  const keyFill = (midi, whiteDefault) => {
+    if (midi === currentMidi) return '#8c73e8'; // rechterhand (R), te spelen
+    if (contextMidis.includes(midi)) return '#2dd4bf'; // linkerhand, alleen ter context
+    return whiteDefault;
+  };
+
+  KEYBOARD_LAYOUT.filter(k => k.white).forEach(k => {
+    el('rect', {
+      x: k.x, y: 0, width: KEY_WHITE_W - 1, height: KEY_WHITE_H, rx: 3,
+      fill: keyFill(k.midi, '#fff'), stroke: '#2b2640', 'stroke-width': 1
+    }, svgEl);
+    if (k.midi === currentMidi) {
+      el('text', {
+        x: k.x + (KEY_WHITE_W - 1) / 2, y: KEY_WHITE_H - 14, 'font-size': 14,
+        'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
+      }, svgEl).textContent = 'R' + current.finger;
+    }
+  });
+  KEYBOARD_LAYOUT.filter(k => !k.white).forEach(k => {
+    el('rect', {
+      x: k.x, y: 0, width: KEY_BLACK_W, height: KEY_BLACK_H, rx: 2,
+      fill: keyFill(k.midi, '#2b2640')
+    }, svgEl);
+    if (k.midi === currentMidi) {
+      el('text', {
+        x: k.x + KEY_BLACK_W / 2, y: KEY_BLACK_H - 9, 'font-size': 11,
+        'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
+      }, svgEl).textContent = 'R' + current.finger;
+    }
+  });
+}
+// Schaal van de hele notenbalk (afstand tussen noten, lijnafstand, en alle
+// lettergroottes/lijndiktes in drawGrandStaff): vergroot op verzoek, omdat de
+// notatie anders te klein oogde t.o.v. de rest van de kaart. Hoger zetten maakt
+// alles groter, maar een lang stuk heeft dan ook eerder horizontaal scrollen nodig
+// (elke noot neemt meer ruimte in).
+const STAFF_SCALE = 1.3;
+const STAFF_X0 = 110 * STAFF_SCALE;     // linkermarge vóór de eerste noot
+const NOTE_SPACING = 34 * STAFF_SCALE;  // afstand tussen twee noten/tellen
+const yOf = step => (170 - (step - 30) * 10) * STAFF_SCALE; // E4 zit op de onderste lijn
+const yOfBass = step => (330 - (step - 18) * 10) * STAFF_SCALE; // G2 zit op de onderste lijn
+const xOf = i => STAFF_X0 + i * NOTE_SPACING;
 
 // X-positie van een noot. Bij een lied zonder linkerhand staan de noten gewoon
 // even ver uit elkaar op volgorde (xOf). Heeft een lied wel een linkerhand, dan
 // moeten beide handen op dezelfde tel verticaal uitgelijnd staan, dus dan telt
 // de echte teltijd (note.start) in plaats van de positie in de rij.
 function noteX(note, i) {
-  return song.left ? (110 + note.start * 34) : xOf(i);
+  return song.left ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
 }
 
 // X-positie van de speelstreep op tijdstip t (in tellen).
 function xAtTime(t) {
-  if (song.left) return 110 + Math.max(0, t) * 34;
+  if (song.left) return STAFF_X0 + Math.max(0, t) * NOTE_SPACING;
   if (!notes.length) return xOf(0);
   let i = 0;
   while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
   const cur = notes[i];
-  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + 34;
+  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + NOTE_SPACING;
   const frac = cur.dur > 0 ? Math.min(1, Math.max(0, (t - cur.start) / cur.dur)) : 0;
   return xOf(i) + frac * (nextX - xOf(i));
+}
+
+// Omgekeerde van xAtTime/noteX: de teltijd die bij een x-positie hoort. Gebruikt
+// om te bepalen waar de speler naartoe heeft gescrold tijdens Speel af.
+function timeAtX(x) {
+  if (song.left) return Math.max(0, (x - STAFF_X0) / NOTE_SPACING);
+  if (!notes.length) return 0;
+  const i = Math.round((x - STAFF_X0) / NOTE_SPACING);
+  const clamped = Math.max(0, Math.min(notes.length - 1, i));
+  return notes[clamped].start;
 }
 
 // ---------- Spelstatus ----------
@@ -700,11 +1004,28 @@ let song = SONGS[0];
 let notes = [];
 let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
+let noteResults = []; // per noot-index: 'hit' | 'missed' | undefined (nog niet aan de beurt geweest)
+// passedIdx: hoort bij idx, maar puur op basis van de rode speelstreep (geen
+// tijdvenster/marge). idx mag door MISS_GRACE_MS en een ruim niveau-tijdvenster
+// best een stukje achterblijven (bewust, voor de scoring), maar dat zorgde
+// ervoor dat noten pas lang nadat de streep ze gepasseerd was verkleurden.
+// passedIdx bepaalt die kleur meteen; noteResults (hit/missed) wint daar
+// altijd van, dus een late maar nog geldige treffer kleurt alsnog groen.
+let passedIdx = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
 let metronomeOn = false;
+let currentPlayHasSound = false; // of de lopende "Speel af" met pianogeluid speelt, voor herplannen na scroll-verspringen
 let phRect = null, liveMarker = null, liveLabel = null;
 let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan mag het automatisch meescrollen
+// dat niet meteen weer overschrijven. lastProgrammaticScrollLeft onderscheidt onze eigen
+// auto-scroll van een scroll door de speler: zet scrollLeft zelf, dan is het die van ons.
+let lastProgrammaticScrollLeft = null;
+let suppressAutoScroll = false;
+let userScrollTimer = null;
+const SCROLL_SEEK_DELAY_MS = 300;
 
 // Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
 // cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
@@ -713,9 +1034,16 @@ function parseHand(hand) {
   let cum = 0;
   return hand.notes.map((n, i) => {
     const dur = durations[i];
-    const note = n === null
-      ? { rest: true, start: cum, dur, label: 'rust', finger: null }
-      : { ...parseNote(n), rest: false, finger: hand.fingers[i], start: cum, dur };
+    let note;
+    if (n === null) {
+      note = { rest: true, start: cum, dur, label: 'rust', finger: null };
+    } else if (Array.isArray(n)) {
+      // Akkoord: meerdere toonhoogtes tegelijk op deze tel, zie uitleg bij SONGS.
+      const pitches = n.map(parseNote);
+      note = { rest: false, chord: true, pitches, finger: hand.fingers[i], start: cum, dur, label: pitches.map(p => p.label).join('+') };
+    } else {
+      note = { ...parseNote(n), rest: false, finger: hand.fingers[i], start: cum, dur };
+    }
     cum += dur;
     return note;
   });
@@ -728,7 +1056,7 @@ function loadSong(s) {
   beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
-  idx = 0; wrongs = 0; streak = 0;
+  idx = 0; wrongs = 0; streak = 0; noteResults = []; passedIdx = 0;
   skipRests();
   document.getElementById('title').textContent = s.title;
   const warn = document.getElementById('draftWarn');
@@ -758,8 +1086,6 @@ function updateStats() {
   document.getElementById('xp').textContent = xp;
   document.getElementById('streak').textContent = streak;
   document.getElementById('stars').textContent = totalStars;
-  const pct = notes.length ? (idx / notes.length) * 100 : 0;
-  document.getElementById('bar').style.width = pct + '%';
 }
 
 // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
@@ -770,6 +1096,23 @@ const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 
 // bij een /4-maatsoort: er wordt per tel gebalkt). Een rust, een andere
 // nootwaarde, of de grens van de tel breekt een groep af. Een groep van 1
 // (geïsoleerde achtste) krijgt nog gewoon een vlaggetje, zoals voorheen.
+// Een akkoord (alleen linkerhand) heeft geen losse .step: de stokrichting en
+// -lengte gaan dan uit van de toonhoogte die het verst van de middenlijn af
+// staat, net als in drawNote.
+function farStepOf(n, middleLineStep) {
+  if (!n.chord) return n.step;
+  const steps = n.pitches.map(p => p.step);
+  const minStep = Math.min(...steps), maxStep = Math.max(...steps);
+  return Math.abs(maxStep - middleLineStep) >= Math.abs(minStep - middleLineStep) ? maxStep : minStep;
+}
+// Het stokuiteinde van een akkoord ligt voorbij de buitenste toonhoogte in de
+// (al bepaalde) stokrichting; bij een losse noot is dat gewoon zijn eigen step.
+function stemTipStepOf(n, stemUp) {
+  if (!n.chord) return n.step;
+  const steps = n.pitches.map(p => p.step);
+  return stemUp ? Math.max(...steps) : Math.min(...steps);
+}
+
 function computeBeamGroups(arr, middleLineStep) {
   const groups = [];
   let i = 0;
@@ -786,7 +1129,7 @@ function computeBeamGroups(arr, middleLineStep) {
     if (j - i >= 2) {
       const indices = [];
       for (let k = i; k < j; k++) indices.push(k);
-      const avgStep = indices.reduce((s, k) => s + arr[k].step, 0) / indices.length;
+      const avgStep = indices.reduce((s, k) => s + farStepOf(arr[k], middleLineStep), 0) / indices.length;
       groups.push({ indices, stemUp: avgStep <= middleLineStep });
     }
     i = j;
@@ -800,11 +1143,12 @@ function computeBeamGroups(arr, middleLineStep) {
 // allemaal op dezelfde hoogte staan, net als bij echte notenbalken).
 function buildBeamLookup(groups, px, yOfFn, arr) {
   const perNote = new Map();
+  const stemLen = 44 * STAFF_SCALE;
   groups.forEach(g => {
     const first = g.indices[0], last = g.indices[g.indices.length - 1];
     const x0 = px(arr[first], first), x1 = px(arr[last], last);
-    const y0 = yOfFn(arr[first].step) + (g.stemUp ? -44 : 44);
-    const y1 = yOfFn(arr[last].step) + (g.stemUp ? -44 : 44);
+    const y0 = yOfFn(stemTipStepOf(arr[first], g.stemUp)) + (g.stemUp ? -stemLen : stemLen);
+    const y1 = yOfFn(stemTipStepOf(arr[last], g.stemUp)) + (g.stemUp ? -stemLen : stemLen);
     g.indices.forEach(k => {
       const x = px(arr[k], k);
       const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
@@ -824,8 +1168,12 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   svgEl.innerHTML = '';
   const previewMode = activeIdx === null;
   const hasLeft = leftNotes && leftNotes.length > 0;
-  const svgHeight = hasLeft ? 420 : 240;
-  const staffTop = 90, staffBottom = hasLeft ? 330 : 170;
+  // S schaalt een los pixel-/lettergroottegetal mee met STAFF_SCALE. yOf/yOfBass/
+  // xOf/STAFF_X0/NOTE_SPACING zijn al geschaald; alle andere maten hier (lijndiktes,
+  // lettergroottes, marges) lopen via S zodat de hele notenbalk in verhouding blijft.
+  const S = v => v * STAFF_SCALE;
+  const svgHeight = S(hasLeft ? 420 : 240);
+  const staffTop = S(90), staffBottom = S(hasLeft ? 330 : 170);
 
   const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
   const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
@@ -837,38 +1185,38 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // (xOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
   // uitgelijnd staan, dus dan telt de echte teltijd (note.start) voor de
   // x-positie, bij beide handen.
-  const px = (note, i) => hasLeft ? (110 + note.start * 34) : xOf(i);
+  const px = (note, i) => hasLeft ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
   const svgWidth = hasLeft
-    ? Math.max(600, 110 + lastEndBeat * 34 + 60)
-    : Math.max(600, xOf(Math.max(rightNotes.length - 1, 0)) + 60);
+    ? Math.max(S(600), STAFF_X0 + lastEndBeat * NOTE_SPACING + S(60))
+    : Math.max(S(600), xOf(Math.max(rightNotes.length - 1, 0)) + S(60));
   svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
   svgEl.style.minWidth = svgWidth + 'px';
 
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
+  [90,110,130,150,170].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));
+  const clef = el('text', { x:S(22), y:S(158), 'font-size':S(70), fill:'#2b2640' }, svgEl);
   clef.textContent = '\u{1D11E}';
 
   if (hasLeft) {
-    [250,270,290,310,330].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
-    const bassClef = el('text', { x:20, y:300, 'font-size':48, fill:'#2b2640' }, svgEl);
+    [250,270,290,310,330].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));
+    const bassClef = el('text', { x:S(20), y:S(300), 'font-size':S(48), fill:'#2b2640' }, svgEl);
     bassClef.textContent = '\u{1D122}';
   }
 
   // Maatsoort: altijd een /4-maatsoort in dit datamodel (dur:1 = kwartnoot),
   // teller is het aantal tellen per maat. Op elke notenbalk van het stuk.
   function timeSignature(cx, topY, bottomY) {
-    const num = el('text', { x:cx, y:topY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    const num = el('text', { x:cx, y:topY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     num.textContent = String(beatsPerMeasure);
-    const den = el('text', { x:cx, y:bottomY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    const den = el('text', { x:cx, y:bottomY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     den.textContent = '4';
   }
-  timeSignature(82, 118, 158);
-  if (hasLeft) timeSignature(82, 278, 318);
+  timeSignature(S(82), S(118), S(158));
+  if (hasLeft) timeSignature(S(82), S(278), S(318));
 
   let playhead = null;
   if (!previewMode) {
     // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-    playhead = el('rect', { x:0, y:staffTop - 35, width:3, height: staffBottom - staffTop + 70, rx:1.5, fill:'#e0496a', opacity:0 }, svgEl);
+    playhead = el('rect', { x:0, y:staffTop - S(35), width:S(3), height: staffBottom - staffTop + S(70), rx:S(1.5), fill:'#e0496a', opacity:0 }, svgEl);
   }
 
   // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
@@ -878,26 +1226,26 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   rightNotes.forEach((n, i) => {
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
     if (i > 0 && measureIdx > lastMeasure) {
-      const x = px(n, i) - 17;
-      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+      const x = px(n, i) - S(17);
+      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
     }
     lastMeasure = measureIdx;
   });
   if (rightNotes.length) {
-    const xEnd = px(lastRight, rightNotes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
+    const xEnd = px(lastRight, rightNotes.length - 1) + S(17);
+    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':S(2.5) }, svgEl);
   }
 
   function ledgerLines(x, step, yOfFn, bottomLineStep, topLineStep) {
     if (step < bottomLineStep) {
       for (let s = bottomLineStep - 2; s >= step; s -= 2) {
         const ly = yOfFn(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+        el('line', { x1:x-S(12), x2:x+S(12), y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
       }
     } else if (step > topLineStep) {
       for (let s = topLineStep + 2; s <= step; s += 2) {
         const ly = yOfFn(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+        el('line', { x1:x-S(12), x2:x+S(12), y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
       }
     }
   }
@@ -920,74 +1268,129 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
 
     if (n.rest) {
       const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
-      const rest = el('text', { x, y: yOfFn(bottomLineStep) - 24, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
+      const rest = el('text', { x, y: yOfFn(bottomLineStep) - S(24), 'font-size':S(32), 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
 
-    const y = yOfFn(n.step);
-    const isC = n.letter === 'C';
-    const fill = isC ? '#ec8f4c' : '#2b2640';
+    // Eén noot wordt hier als een akkoord van één toonhoogte behandeld, zodat
+    // een echt akkoord (een lijst toonhoogtes op dezelfde tel) en een losse noot
+    // met dezelfde tekencode af kunnen.
+    const pitches = n.chord ? n.pitches : [n];
+    const steps = pitches.map(p => p.step);
+    const minStep = Math.min(...steps), maxStep = Math.max(...steps);
+
     const dur = n.dur || 1;
     const hollow = dur >= 2;
     const hasStem = dur < 4; // een hele noot heeft geen stok
+    // Stokrichting op basis van de toonhoogte die het verst van de middenlijn af
+    // staat (bij een akkoord), net als in gangbare notenschrift. Bij een gebalkte
+    // groep geldt voor alle noten in de groep dezelfde, vooraf bepaalde richting.
+    const farStep = Math.abs(maxStep - middleLineStep) >= Math.abs(minStep - middleLineStep) ? maxStep : minStep;
     const beamed = beamMap && beamMap.get(i);
-    const stemUp = beamed ? beamed.stemUp : n.step <= middleLineStep;
+    const stemUp = beamed ? beamed.stemUp : farStep <= middleLineStep;
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
-        const done = i < activeIdx;
+        // "done" is hier passedIdx tijdens Speel af: de streep is de noot voorbij,
+        // met of zonder officieel oordeel van idx/noteResults (groen alleen als
+        // 'ie echt, eventueel later nog binnen het venster, goed gespeeld is).
+        // De noteResults-uitzondering houdt een eerder oordeel vast als je
+        // terugscrolt: passedIdx zakt dan weer, maar een al beoordeelde noot mag
+        // niet terugspringen naar "nog te doen".
+        const done = i < activeIdx || noteResults[i] !== undefined;
         const current = i === activeIdx;
         noteOpacity = (done || current) ? 1 : 0.45;
-        highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
+        highlight = done ? (noteResults[i] === 'hit' ? '#1f8f68' : '#d9495f') : current ? '#8c73e8' : 'none';
       } else {
         noteOpacity = 0.4;
       }
     }
 
-    ledgerLines(x, n.step, yOfFn, bottomLineStep, topLineStep);
+    const uniqueSteps = [...new Set(steps)].sort((a, b) => a - b);
+    uniqueSteps.forEach(s => ledgerLines(x, s, yOfFn, bottomLineStep, topLineStep));
 
-    // Voorteken: alleen tonen als het verschilt van wat er dit al in deze maat
-    // voor deze toonhoogte getoond is. Een eerder kruis of mol dat weer naar
-    // onveranderd moet, krijgt een herstelteken.
-    const wanted = n.accidental || '';
-    const prevShown = accState.shown[n.step];
-    const needsSign = prevShown === undefined ? wanted !== '' : prevShown !== wanted;
-    if (needsSign) {
-      const sign = el('text', { x: x - 13, y: y + 5, 'font-size':17, 'text-anchor':'middle', fill, opacity: noteOpacity }, svgEl);
-      sign.textContent = wanted === '#' ? '♯' : wanted === 'b' ? '♭' : '♮';
-    }
-    accState.shown[n.step] = wanted;
+    // Voorteken per toonhoogte: alleen tonen als het verschilt van wat er dit al
+    // in deze maat voor deze toonhoogte getoond is. Een eerder kruis of mol dat
+    // weer naar onveranderd moet, krijgt een herstelteken.
+    pitches.forEach(p => {
+      const wanted = p.accidental || '';
+      const prevShown = accState.shown[p.step];
+      const needsSign = prevShown === undefined ? wanted !== '' : prevShown !== wanted;
+      if (needsSign) {
+        const y = yOfFn(p.step);
+        const signFill = p.letter === 'C' ? '#ec8f4c' : '#2b2640';
+        const sign = el('text', { x: x - S(13), y: y + S(5), 'font-size':S(17), 'text-anchor':'middle', fill: signFill, opacity: noteOpacity }, svgEl);
+        sign.textContent = wanted === '#' ? '♯' : wanted === 'b' ? '♭' : '♮';
+      }
+      accState.shown[p.step] = wanted;
+    });
 
-    el('ellipse', {
-      cx:x, cy:y, rx:8, ry:6,
-      fill: hollow ? '#fff' : fill,
-      opacity: noteOpacity,
-      stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
-      'stroke-width': highlight !== 'none' ? 2.5 : 1.8
-    }, svgEl);
+    // Bolletjes die een notenbalkstap (een secunde) uit elkaar liggen zouden
+    // elkaar overlappen; de bovenste van zo'n paar schuift daarom opzij, aan
+    // dezelfde kant als de stok, zoals in gangbare notenschrift. Bij een losse
+    // noot gebeurt hier niets (geen andere toonhoogte om mee te botsen).
+    // data-note-index/data-hand laten animateNoteHit() de notenkop van een
+    // juist geraakte rechterhandnoot terugvinden; bij een akkoord (alleen
+    // linkerhand) krijgt elke notenkop in het akkoord dezelfde twee, dat
+    // wordt daar nog niet gebruikt.
+    pitches.forEach(p => {
+      const y = yOfFn(p.step);
+      const isC = p.letter === 'C';
+      const fill = isC ? '#ec8f4c' : '#2b2640';
+      const clashesBelow = uniqueSteps.includes(p.step - 1);
+      const clashesAbove = uniqueSteps.includes(p.step + 1);
+      const offsetX = (stemUp && clashesBelow) ? S(11) : (!stemUp && clashesAbove) ? -S(11) : 0;
+      el('ellipse', {
+        cx:x + offsetX, cy:y, rx:S(8), ry:S(6),
+        fill: hollow ? '#fff' : fill,
+        opacity: noteOpacity,
+        stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
+        'stroke-width': highlight !== 'none' ? S(2.5) : S(1.8),
+        'data-note-index': i, 'data-hand': handPrefix
+      }, svgEl);
+      if (isDotted(dur)) {
+        el('ellipse', { cx:x + offsetX + S(15), cy:y, rx:S(1.8), ry:S(1.8), fill, opacity: noteOpacity }, svgEl);
+      }
+      // Onzichtbare, ruimere tikzone boven op de echte (kleine) notenkop, zodat
+      // je 'm met je vinger makkelijk raakt. Alleen op de hand die je oefent
+      // (isActiveHand): dat is de toon die je moet spelen. Werkt alleen als er
+      // niet wordt afgespeeld, zie de click-listener onderaan.
+      if (isActiveHand && !previewMode) {
+        el('circle', {
+          cx:x + offsetX, cy:y, r:S(18), fill:'transparent', 'pointer-events':'all',
+          'data-midi': p.midi, style:'cursor:pointer'
+        }, svgEl);
+      }
+    });
 
     if (hasStem) {
-      // Op of boven de middenlijn: stok omlaag aan de linkerkant van de bol.
-      // Eronder: stok omhoog aan de rechterkant, zoals in gangbare notatie.
-      const stemX = stemUp ? x + 7 : x - 7;
-      const stemEndY = beamed ? beamed.stemEndY : (stemUp ? y - 44 : y + 44);
-      el('line', { x1:stemX, x2:stemX, y1:y, y2:stemEndY, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
+      // Eén stok die van de buitenste tot de binnenste toonhoogte van het
+      // akkoord loopt (bij één toon gewoon die ene noot), in de kleur van de
+      // notenbalk, ook als één van de akkoordnoten een C (oranje) is.
+      const stemColor = pitches.length === 1 ? (pitches[0].letter === 'C' ? '#ec8f4c' : '#2b2640') : '#2b2640';
+      const stemX = stemUp ? x + S(7) : x - S(7);
+      const yHigh = yOfFn(maxStep), yLow = yOfFn(minStep); // hogere step = hogere toon = kleinere y
+      const stemStartY = stemUp ? yLow : yHigh;
+      const stemEndY = beamed ? beamed.stemEndY : (stemUp ? yHigh - S(44) : yLow + S(44));
+      el('line', { x1:stemX, x2:stemX, y1:stemStartY, y2:stemEndY, stroke:stemColor, opacity: noteOpacity, 'stroke-width':S(1.6) }, svgEl);
       if (dur < 1 && !beamed) {
         // Vlaggetje voor een losse achtste noot, gespiegeld naar gelang de stokrichting.
         const d = stemUp
-          ? `M ${stemX} ${stemEndY} C ${stemX+12} ${stemEndY+4} ${stemX+9} ${stemEndY+14} ${stemX+0.5} ${stemEndY+19}`
-          : `M ${stemX} ${stemEndY} C ${stemX-12} ${stemEndY-4} ${stemX-9} ${stemEndY-14} ${stemX-0.5} ${stemEndY-19}`;
-        el('path', { d, fill, opacity: noteOpacity }, svgEl);
+          ? `M ${stemX} ${stemEndY} C ${stemX+S(12)} ${stemEndY+S(4)} ${stemX+S(9)} ${stemEndY+S(14)} ${stemX+S(0.5)} ${stemEndY+S(19)}`
+          : `M ${stemX} ${stemEndY} C ${stemX-S(12)} ${stemEndY-S(4)} ${stemX-S(9)} ${stemEndY-S(14)} ${stemX-S(0.5)} ${stemEndY-S(19)}`;
+        el('path', { d, fill: stemColor, opacity: noteOpacity }, svgEl);
       }
     }
-    if (isDotted(dur)) {
-      el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
-    }
 
-    const fingerY = n.step <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + 26 : y + 26;
-    const finger = el('text', { x, y: fingerY, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
-    finger.textContent = handPrefix + n.finger;
+    // Rechterhand-vingerzetting (R1 t/m R5) staat niet meer onder de noot: dat
+    // toont het pianotoetsenbord nu al op de toets zelf. Linkerhand-vingerzetting
+    // (L1 t/m L5) blijft wel op de notenbalk staan, die staat nergens anders.
+    if (!isActiveHand) {
+      const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + S(26) : yOfFn(minStep) + S(26);
+      const finger = el('text', { x, y: fingerY, 'font-size':S(13), 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
+      finger.textContent = handPrefix + n.finger;
+    }
   }
 
   // Balkgroepen (gebalkte achtste noten): per hand de aaneengesloten achtsten
@@ -996,7 +1399,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   function drawBeams(groups) {
     groups.forEach(g => {
       const { x0, y0, x1, y1 } = g.beamLine;
-      el('line', { x1:x0, x2:x1, y1:y0, y2:y1, stroke:'#2b2640', 'stroke-width':4 }, svgEl);
+      el('line', { x1:x0, x2:x1, y1:y0, y2:y1, stroke:'#2b2640', 'stroke-width':S(4) }, svgEl);
     });
   }
 
@@ -1017,34 +1420,84 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
 }
 
 function render() {
-  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx);
+  // Tijdens Speel af kleurt de notenbalk op passedIdx (puur de rode speelstreep,
+  // geen venster/marge), niet op idx (de scoring-pointer, die bewust wat coulance
+  // heeft): zie de toelichting bij passedIdx hierboven. Buiten Speel af (oefenen,
+  // een lied laden) is er geen speelstreep en zijn idx/passedIdx gelijk.
+  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, playing ? passedIdx : idx);
   phRect = playhead;
 
-  // Los van de SVG (die zijwaarts kan scrollen) zodat deze tekst altijd
-  // gewoon in het midden van het scherm blijft staan, ook bij een lang stuk.
-  document.getElementById('playLabel').textContent = idx < notes.length
-    ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
-    : 'Klaar!';
+  // Staat de microfoon nog uit, dan krijgt de microfoonknop een zachte amber
+  // rand (zie CLAUDE.md): geen aparte tekstmelding meer, dat stond nu in de
+  // weg van het pianotoetsenbord, dat immers al laat zien wat er moet gebeuren.
+  document.getElementById('micBtn').classList.toggle('micOffHint', !micOn);
 
   // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.
-  liveMarker = el('circle', { cx:0, cy:0, r:6, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5, opacity:0 });
-  liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
+  liveMarker = el('circle', { cx:0, cy:0, r:6 * STAFF_SCALE, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5 * STAFF_SCALE, opacity:0 });
+  liveLabel = el('text', { x:0, y:0, 'font-size':12 * STAFF_SCALE, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
 
   if (notes.length) {
     const anchorIdx = Math.min(idx, notes.length - 1);
     scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
   }
+
+  renderKeyboard();
+}
+
+// Korte flits bij een juist geraakte noot, zoals in ritmespellen als Guitar Hero:
+// de noot zelf veert even op en een ring dijt uit en vervaagt eromheen. Gemiste of
+// nog niet gespeelde noten blijven gewoon staan (geen animatie, zie drawNote's
+// highlight-logica voor hun kleur). Werkt los van render()/drawGrandStaff: die
+// hertekent de hele notenbalk bij elke noot, dus deze animatie wordt apart
+// getriggerd nadat de notenbalk opnieuw getekend is, op precies die ene noot.
+function animateNoteHit(i) {
+  const notehead = document.querySelector(`#staff ellipse[data-note-index="${i}"][data-hand="R"]`);
+  if (!notehead) return;
+
+  notehead.style.transformBox = 'fill-box';
+  notehead.style.transformOrigin = 'center';
+  notehead.animate(
+    [{ transform: 'scale(1)' }, { transform: 'scale(1.6)', offset: 0.3 }, { transform: 'scale(1)' }],
+    { duration: 380, easing: 'ease-out' }
+  );
+
+  const cx = notehead.getAttribute('cx'), cy = notehead.getAttribute('cy');
+  const ring = el('circle', { cx, cy, r: 8 * STAFF_SCALE, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3 * STAFF_SCALE, opacity: 0.9 });
+  ring.style.transformBox = 'fill-box';
+  ring.style.transformOrigin = 'center';
+  const anim = ring.animate(
+    [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(3.2)', opacity: 0 }],
+    { duration: 450, easing: 'ease-out' }
+  );
+  anim.onfinish = () => ring.remove();
 }
 
 // Schuift de notenbalk automatisch mee: de huidige noot komt links in beeld,
 // met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
 // noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
 function scrollStaffFollow(x, hasPrevious) {
+  if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
   const wrap = document.querySelector('.staffWrap');
   if (!wrap) return;
-  const target = hasPrevious ? x - 34 - 20 : 0;
+  const target = hasPrevious ? x - NOTE_SPACING - 20 * STAFF_SCALE : 0;
   const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
   wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  lastProgrammaticScrollLeft = wrap.scrollLeft;
+}
+
+// Tijdens "Speel af": de speelstreep blijft vast op 1/3 van het zichtbare stuk
+// staan (de "startstand"), de notenbalk schuift daar continu onderdoor, zoals
+// een pianorol. PLAYHEAD_FRACTION is diezelfde 1/3 voor zowel het scrollen hier
+// als het terugrekenen bij handmatig scrollen (zie de scroll-listener onderaan).
+const PLAYHEAD_FRACTION = 1 / 3;
+function scrollStaffFollowPlayhead(x) {
+  if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
+  const wrap = document.querySelector('.staffWrap');
+  if (!wrap) return;
+  const target = x - wrap.clientWidth * PLAYHEAD_FRACTION;
+  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+  wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  lastProgrammaticScrollLeft = wrap.scrollLeft;
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
@@ -1061,6 +1514,7 @@ function onHeard(midi, tEvent) {
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
     if (pitchOk) {
+      const hitIdx = idx;
       const pitchPts = exactOctave ? 10 : 6;
       xp += pitchPts;
       streak++;
@@ -1069,8 +1523,9 @@ function onHeard(midi, tEvent) {
       idx++;
       skipRests();
       setFeedback(`Goed! +${pitchPts} toon${exactOctave ? '' : ' (andere octaaf telt ook)'}${streakNote}`, 'ok');
+      render();
+      animateNoteHit(hitIdx);
       if (idx === notes.length) finish();
-      else render();
     } else {
       wrongs++;
       streak = 0;
@@ -1105,6 +1560,8 @@ function onHeard(midi, tEvent) {
   streak++;
   let streakNote = '';
   if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
+  const hitIdx = idx;
+  noteResults[idx] = 'hit';
   idx++;
   skipRests();
   const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
@@ -1112,12 +1569,12 @@ function onHeard(midi, tEvent) {
 
   if (idx === notes.length) stopPlay(true);
   else { render(); updateStats(); }
+  animateNoteHit(hitIdx);
 }
 
 function finish() {
   const stars = wrongs === 0 ? 3 : wrongs <= 2 ? 2 : 1;
   totalStars += stars;
-  setFeedback(`Klaar! ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, 'ok');
   document.getElementById('restart').disabled = false;
   updateStats();
 }
@@ -1259,6 +1716,46 @@ function scheduleNoteSound(midi, when, duration) {
   }
 }
 
+// AudioContext.currentTime is het moment waarop een geluid de audio-pijplijn ingaat,
+// niet het moment waarop het echt uit de speaker komt: daar zit altijd nog
+// hardware-/driverlatency tussen (outputLatency, soms tientallen ms, op sommige
+// apparaten meer). Zonder correctie klinkt elke geplande noot dus altijd een beetje
+// na de rode speelstreep/animatie, die wel exact in real time lopen. Door audioStart
+// met die latency te verlagen, komt het geluid eerder uit de pijplijn en dus precies
+// op het juiste moment uit de speaker.
+function audioNow() {
+  return audioCtx.currentTime - (audioCtx.outputLatency || audioCtx.baseLatency || 0);
+}
+
+// Plant de metronoomtikken van het lied (niet het aftellen) vanaf fromBeat, zodat zowel
+// een gewone start (fromBeat 0) als verdergaan na een scroll-sprong (fromBeat = waar je
+// naartoe scrolde) dezelfde planning gebruiken.
+function scheduleMetronomeFromBeat(fromBeat, audioStart, beatSec) {
+  const beatsPerMeasure = song.beatsPerMeasure || 4;
+  const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
+  for (let b = Math.max(0, Math.ceil(fromBeat)); b < songBeats; b++) {
+    scheduleMetronomeTick(audioStart + (b - fromBeat) * beatSec, b % beatsPerMeasure === 0);
+  }
+}
+
+// Plant het pianogeluid van de noten vanaf fromBeat, zelfde reden als hierboven.
+function scheduleNotesFromBeat(fromBeat, audioStart, beatSec) {
+  const noteList = [...notes, ...contextNotes].filter(n => !n.rest && n.start >= fromBeat);
+  loadPianoSamples(audioCtx).finally(() => {
+    if (!playing) return; // intussen gestopt of opnieuw verplaatst, niet meer plannen
+    noteList.forEach(n => {
+      const when = audioStart + (n.start - fromBeat) * beatSec;
+      const dur = n.dur * beatSec * 0.85;
+      // Akkoord (alleen linkerhand, zie SONGS-uitleg): alle toonhoogtes tegelijk.
+      if (n.chord) {
+        n.pitches.forEach(p => scheduleNoteSound(p.midi, when, dur));
+      } else {
+        scheduleNoteSound(n.midi, when, dur);
+      }
+    });
+  });
+}
+
 function scheduleSynthesizedNote(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
@@ -1319,7 +1816,7 @@ function setPlayButtonsState(isPlaying) {
 function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
-  idx = 0; wrongs = 0; streak = 0;
+  idx = 0; wrongs = 0; streak = 0; noteResults = []; passedIdx = 0;
   skipRests();
   playing = true;
   beatMs = 60000 / song.bpm / tempoScale;
@@ -1330,51 +1827,89 @@ function startPlay(forceSound = false) {
   render();
   updateStats();
 
+  currentPlayHasSound = forceSound || document.getElementById('soundToggle').checked;
+
   if (audioCtx) {
     const beatSec = beatMs / 1000;
-    const audioStart = audioCtx.currentTime;
+    const audioStart = audioNow();
 
     if (metronomeOn) {
-      const beatsPerMeasure = song.beatsPerMeasure || 4;
       for (let c = 0; c < COUNT_IN; c++) {
         scheduleMetronomeTick(audioStart + c * beatSec, c === 0);
       }
-      const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
-      for (let b = 0; b < songBeats; b++) {
-        scheduleMetronomeTick(audioStart + (COUNT_IN + b) * beatSec, b % beatsPerMeasure === 0);
-      }
+      scheduleMetronomeFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
     }
 
-    if (forceSound || document.getElementById('soundToggle').checked) {
-      // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
-      // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
-      // tussen de handen te horen.
-      const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
-      // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
-      // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
-      // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
-      // op null en gebruiken we de synthese.
-      loadPianoSamples(audioCtx).finally(() => {
-        if (!playing) return; // intussen gestopt, niet meer plannen
-        noteList.forEach(n => {
-          scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
-        });
-      });
+    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de rechterhand
+    // beoordeeld: dat klinkt muzikaler en helpt om de samenhang tussen de handen te horen.
+    if (currentPlayHasSound) {
+      scheduleNotesFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
     }
   }
 
   rafId = requestAnimationFrame(tick);
 }
 
+// Verspring de speelpositie naar targetT (in tellen) zonder de score of de reeks te
+// resetten: bedoeld voor wanneer de speler tijdens Speel af zelf over de notenbalk
+// scrolt. Annuleert het reeds geplande geluid en plant het opnieuw vanaf de nieuwe plek.
+function seekTo(targetT) {
+  if (!playing || !notes.length) return;
+  targetT = Math.max(0, targetT);
+
+  scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledSources = [];
+
+  let newIdx = notes.findIndex(n => n.start + n.dur > targetT);
+  if (newIdx === -1) newIdx = Math.max(0, notes.length - 1);
+  // Vooruit scrollen slaat noten over die nog niet aan de beurt zijn geweest: die
+  // zijn net zo min gespeeld als een gemiste noot, dus geen stille groene valse
+  // positief op de notenbalk.
+  for (let i = idx; i < newIdx; i++) {
+    if (!notes[i].rest && noteResults[i] === undefined) noteResults[i] = 'missed';
+  }
+  idx = newIdx;
+  skipRests();
+  // newIdx is hier al "de eerste noot die targetT nog niet voorbij is", exact
+  // dezelfde definitie als waar passedIdx's eigen lus in tick() naartoe loopt
+  // voor dat tijdstip. Terugscrollen laat eerder gepasseerde (nog niet
+  // beoordeelde) noten dus weer gewoon als "nog te doen" zien; al beoordeelde
+  // noten blijven hun kleur houden via noteResults, zie drawNote.
+  passedIdx = newIdx;
+
+  // Geen aftellen: startT zo zetten dat tick() meteen op targetT uitkomt.
+  startT = performance.now() - (targetT + COUNT_IN) * beatMs;
+  resetNoteDetection();
+  render();
+  updateStats();
+
+  if (audioCtx) {
+    const beatSec = beatMs / 1000;
+    const audioStart = audioNow();
+    if (metronomeOn) scheduleMetronomeFromBeat(targetT, audioStart, beatSec);
+    if (currentPlayHasSound) scheduleNotesFromBeat(targetT, audioStart, beatSec);
+  }
+}
+
 function tick(now) {
   if (!playing) return;
+  if (suppressAutoScroll) {
+    // De speler sleept zelf over de notenbalk: alles even bevriezen (geen noten
+    // die stilletjes als gemist tellen, geen geluid dat niet meer bij het
+    // zichtbare stuk hoort) totdat seekTo() de klok opnieuw gelijkzet.
+    rafId = requestAnimationFrame(tick);
+    return;
+  }
   const t = (now - startT) / beatMs - COUNT_IN;
 
   if (t < 0) {
     const countdown = Math.ceil(-t);
-    setFeedback(`Tel mee... ${countdown}`, '');
+    document.getElementById('countInNumber').textContent = countdown;
+    document.getElementById('countInOverlay').classList.add('show');
+    setFeedback('Tel mee...', '');
     phRect.setAttribute('opacity', 0);
   } else {
+    document.getElementById('countInOverlay').classList.remove('show');
     // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
     // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
     //
@@ -1395,11 +1930,23 @@ function tick(now) {
       const m = notes[idx];
       wrongs++;
       streak = 0;
+      noteResults[idx] = 'missed';
       idx++;
       missed = true;
       setFeedback(`Gemist: ${m.label} met R${m.finger}`, 'bad');
     }
-    if (missed) { render(); updateStats(); }
+
+    // passedIdx loopt los van idx mee, zonder venster/marge: zodra de streep een
+    // noot voorbij is, telt 'ie als gepasseerd voor de kleur op de notenbalk, ook
+    // al heeft idx 'm (dankzij het ruimere niveau-venster/MISS_GRACE_MS) nog niet
+    // definitief afgeschreven. Speel je 'm alsnog op tijd (binnen dat venster),
+    // dan kleurt-ie via noteResults alsnog groen in plaats van rood.
+    let passed = false;
+    while (passedIdx < notes.length && (notes[passedIdx].rest || t > notes[passedIdx].start + notes[passedIdx].dur)) {
+      passedIdx++;
+      passed = true;
+    }
+    if (missed || passed) { render(); updateStats(); }
 
     if (idx >= notes.length) {
       stopPlay(true);
@@ -1408,7 +1955,7 @@ function tick(now) {
     const x = xAtTime(t);
     phRect.setAttribute('x', x - 1.5);
     phRect.setAttribute('opacity', 1);
-    scrollStaffFollow(x, idx > 0);
+    scrollStaffFollowPlayhead(x);
   }
   rafId = requestAnimationFrame(tick);
 }
@@ -1418,6 +1965,9 @@ function stopPlay(completed) {
   scheduledSources = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
+  clearTimeout(userScrollTimer);
+  suppressAutoScroll = false;
+  document.getElementById('countInOverlay').classList.remove('show');
   const was = playing;
   playing = false;
   setPlayButtonsState(false);
@@ -1449,14 +1999,25 @@ function micErrorText(err) {
   }
 }
 
+// Maakt audioCtx aan als die nog niet bestaat (voor zowel de microfoon als het
+// beluisteren van een losse noot door erop te klikken), en laadt de pianosamples
+// er dan meteen bij. Idempotent: een tweede aanroep hergebruikt gewoon de
+// bestaande audioCtx, in plaats van 'm te vervangen en de samples opnieuw te laden.
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    loadPianoSamples(audioCtx);
+  }
+  return audioCtx;
+}
+
 async function startMic() {
   if (micOn) return true;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
     });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    loadPianoSamples(audioCtx); // alvast op de achtergrond, klaar voordat "Speel af" ze nodig heeft
+    ensureAudioCtx();
     const src = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
@@ -1465,6 +2026,7 @@ async function startMic() {
     micOn = true;
     const micBtnEl = document.getElementById('micBtn');
     micBtnEl.classList.add('is-on');
+    micBtnEl.classList.remove('micOffHint');
     micBtnEl.disabled = true;
     setIconLabel(micBtnEl, 'Microfoon actief');
     listenTimer = setInterval(listen, 60);
@@ -1633,7 +2195,7 @@ function updateLiveMarker(f1, f2, midi) {
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
-  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20;
+  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20 * STAFF_SCALE;
   const color = confident ? '#2dd4bf' : '#f5a623';
 
   liveMarker.setAttribute('cx', x);
@@ -1861,9 +2423,26 @@ function selectEl(className, options, selected, labelFn) {
   return sel;
 }
 
+function createPitchGroup(opts = {}) {
+  const span = document.createElement('span');
+  span.className = 'pitchGroup';
+  const letterSel = selectEl('letterSel', LETTERS_ORDER, opts.letter || 'C');
+  const accSel = selectEl('accSel', ACCIDENTALS, opts.accidental || '');
+  const octSel = selectEl('octSel', [3,4,5,6], opts.octave || 4);
+  span.appendChild(letterSel);
+  span.appendChild(accSel);
+  span.appendChild(octSel);
+  return { span, letterSel, accSel, octSel };
+}
+
+// handPrefix 'L' (linkerhand) mag akkoorden: met "+ akkoord" krijgt deze tel
+// een extra toonhoogte die er tegelijk mee klinkt. De rechterhand (die de
+// microfoon beoordeelt, en die maar één toon tegelijk herkent) blijft één
+// toon per tel, dus krijgt die knop niet.
 function createNoteRow(opts = {}, handPrefix = 'R') {
   const row = document.createElement('div');
   row.className = 'noteRow';
+  const allowChord = handPrefix === 'L';
 
   const num = document.createElement('span');
   num.className = 'rowNum';
@@ -1879,12 +2458,53 @@ function createNoteRow(opts = {}, handPrefix = 'R') {
   restLabel.appendChild(document.createTextNode('rust'));
   row.appendChild(restLabel);
 
-  const letterSel = selectEl('letterSel', LETTERS_ORDER, opts.letter || 'C');
-  const accSel = selectEl('accSel', ACCIDENTALS, opts.accidental || '');
-  const octSel = selectEl('octSel', [3,4,5,6], opts.octave || 4);
+  const pitchesWrap = document.createElement('span');
+  pitchesWrap.className = 'pitchesWrap';
+  row.appendChild(pitchesWrap);
+
+  const mainPitch = createPitchGroup(opts);
+  pitchesWrap.appendChild(mainPitch.span);
+  const extraGroups = [];
+
+  function addExtraPitch() {
+    const plus = document.createElement('span');
+    plus.className = 'chordPlus';
+    plus.textContent = '+';
+    const group = createPitchGroup();
+    const removeP = document.createElement('button');
+    removeP.type = 'button';
+    removeP.className = 'removePitch';
+    removeP.textContent = '✕';
+    removeP.title = 'Deze toon uit het akkoord halen';
+    removeP.addEventListener('click', () => {
+      plus.remove(); group.span.remove(); removeP.remove();
+      const gi = extraGroups.indexOf(group);
+      if (gi >= 0) extraGroups.splice(gi, 1);
+      renderPreview();
+    });
+    pitchesWrap.appendChild(plus);
+    pitchesWrap.appendChild(group.span);
+    pitchesWrap.appendChild(removeP);
+    extraGroups.push(group);
+    [group.letterSel, group.accSel, group.octSel].forEach(inp => inp.addEventListener('change', renderPreview));
+    renderPreview();
+  }
+
+  let addPitchBtn = null;
+  if (allowChord) {
+    addPitchBtn = document.createElement('button');
+    addPitchBtn.type = 'button';
+    addPitchBtn.className = 'addPitch';
+    addPitchBtn.textContent = '+ akkoord';
+    addPitchBtn.title = 'Nog een toon toevoegen die tegelijk met deze klinkt';
+    addPitchBtn.addEventListener('click', addExtraPitch);
+    row.appendChild(addPitchBtn);
+  }
+
   const durSel = selectEl('durSel', DURATIONS, opts.dur || 1);
   const fingerSel = selectEl('fingerSel', [1,2,3,4,5].map(f => [f, handPrefix + f]), opts.finger || 1);
-  [letterSel, accSel, octSel, durSel, fingerSel].forEach(s => row.appendChild(s));
+  row.appendChild(durSel);
+  row.appendChild(fingerSel);
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
@@ -1895,13 +2515,15 @@ function createNoteRow(opts = {}, handPrefix = 'R') {
 
   function applyRestState() {
     const isRest = restCb.checked;
-    letterSel.disabled = isRest;
-    accSel.disabled = isRest;
-    octSel.disabled = isRest;
+    mainPitch.letterSel.disabled = isRest;
+    mainPitch.accSel.disabled = isRest;
+    mainPitch.octSel.disabled = isRest;
     fingerSel.disabled = isRest;
+    if (addPitchBtn) addPitchBtn.disabled = isRest;
+    extraGroups.forEach(g => { g.letterSel.disabled = isRest; g.accSel.disabled = isRest; g.octSel.disabled = isRest; });
   }
   applyRestState();
-  [restCb, letterSel, accSel, octSel, durSel, fingerSel].forEach(inp => {
+  [restCb, mainPitch.letterSel, mainPitch.accSel, mainPitch.octSel, durSel, fingerSel].forEach(inp => {
     inp.addEventListener('change', () => { applyRestState(); renderPreview(); });
   });
 
@@ -1940,10 +2562,15 @@ function readNoteRows(containerId) {
       notesOut.push(null);
       fingersOut.push(null);
     } else {
-      const letter = row.querySelector('.letterSel').value;
-      const acc = row.querySelector('.accSel').value;
-      const oct = row.querySelector('.octSel').value;
-      notesOut.push(letter + acc + oct);
+      // Meestal één toonhoogte, bij een akkoord ("+ akkoord") meerdere
+      // .pitchGroup's binnen dezelfde rij; dan wordt het een lijst.
+      const pitches = [...row.querySelectorAll('.pitchGroup')].map(g => {
+        const letter = g.querySelector('.letterSel').value;
+        const acc = g.querySelector('.accSel').value;
+        const oct = g.querySelector('.octSel').value;
+        return letter + acc + oct;
+      });
+      notesOut.push(pitches.length > 1 ? pitches : pitches[0]);
       fingersOut.push(parseInt(row.querySelector('.fingerSel').value, 10));
     }
   });
@@ -1959,18 +2586,9 @@ function renderPreview() {
   if (!right.notes.length && !left.notes.length) { svgEl.innerHTML = ''; return; }
 
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
-  const parseRows = hand => {
-    let cum = 0;
-    return hand.notes.map((n, i) => {
-      const dur = hand.durations[i];
-      const note = n === null
-        ? { rest:true, start:cum, dur, finger:null }
-        : { ...parseNote(n), rest:false, finger:hand.fingers[i], start:cum, dur };
-      cum += dur;
-      return note;
-    });
-  };
-  drawGrandStaff(svgEl, parseRows(right), parseRows(left), beatsPerMeasure, null);
+  // Dezelfde omzetting als bij een opgeslagen lied (parseHand), zodat het
+  // voorbeeldbalkje akkoorden precies zo tekent als de echte oefenbalk dat zou doen.
+  drawGrandStaff(svgEl, parseHand(right), parseHand(left), beatsPerMeasure, null);
 }
 
 document.getElementById('saveSongBtn').addEventListener('click', () => {
@@ -1984,8 +2602,11 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'pill bad'; return; }
   if (!right.notes.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe bij de rechterhand.'; fb.className = 'pill bad'; return; }
   for (const n of [...right.notes, ...left.notes]) {
-    if (n !== null && !/^[A-G](#|b)?[3-6]$/.test(n)) {
-      fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'pill bad'; return;
+    const pitchesToCheck = Array.isArray(n) ? n : [n];
+    for (const p of pitchesToCheck) {
+      if (p !== null && !/^[A-G](#|b)?[3-6]$/.test(p)) {
+        fb.textContent = `Ongeldige noot: ${p}`; fb.className = 'pill bad'; return;
+      }
     }
   }
 
@@ -2138,23 +2759,99 @@ document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
 });
 
+// Tempo staat op twee plekken (Instellingen en de popover bij de metronoom), die
+// moeten synchroon blijven: één functie die altijd beide bijwerkt.
+function setTempoScale(pct) {
+  tempoScale = pct / 100;
+  const label = `${pct}%`;
+  document.getElementById('tempoSlider').value = pct;
+  document.getElementById('tempoValue').textContent = label;
+  document.getElementById('tempoPopoverSlider').value = pct;
+  document.getElementById('tempoPopoverValue').textContent = label;
+}
 document.getElementById('tempoSlider').addEventListener('input', (e) => {
-  tempoScale = Number(e.target.value) / 100;
-  document.getElementById('tempoValue').textContent = `${e.target.value}%`;
+  setTempoScale(Number(e.target.value));
+});
+document.getElementById('tempoPopoverSlider').addEventListener('input', (e) => {
+  setTempoScale(Number(e.target.value));
 });
 
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
-  if (ok) setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
+  if (ok) {
+    setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
+    render();
+  }
+});
+
+// Op een noot tikken laat 'm horen: handig om te weten hoe de toon klinkt
+// voordat je 'm zelf speelt. Alleen in oefenmodus, niet tijdens Speel af (daar
+// zou het door elkaar lopen met de speelstreep en het handmatig scrollen).
+document.getElementById('staff').addEventListener('click', (e) => {
+  if (playing) return;
+  const midiAttr = e.target.getAttribute('data-midi');
+  if (midiAttr === null) return;
+  ensureAudioCtx();
+  scheduleNoteSound(Number(midiAttr), audioCtx.currentTime, 0.6);
 });
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
 
-document.getElementById('metronomeBtn').addEventListener('click', (e) => {
+// Metronoomknop: een gewone tik schakelt hem aan/uit, lang indrukken toont in
+// plaats daarvan het tempo-schuifje (hetzelfde als in Instellingen) in een
+// popover, zodat je het tempo kunt bijstellen zonder het paneel te openen.
+const metronomeBtn = document.getElementById('metronomeBtn');
+const tempoPopover = document.getElementById('tempoPopover');
+const METRONOME_LONG_PRESS_MS = 450;
+let metronomeLongPressTimer = null;
+let metronomeLongPressFired = false;
+
+metronomeBtn.addEventListener('pointerdown', () => {
+  metronomeLongPressFired = false;
+  clearTimeout(metronomeLongPressTimer);
+  metronomeLongPressTimer = setTimeout(() => {
+    metronomeLongPressFired = true;
+    tempoPopover.hidden = false;
+  }, METRONOME_LONG_PRESS_MS);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => {
+  metronomeBtn.addEventListener(evt, () => clearTimeout(metronomeLongPressTimer));
+});
+
+metronomeBtn.addEventListener('click', () => {
+  if (metronomeLongPressFired) { metronomeLongPressFired = false; return; } // lang indrukken opende het tempo, niet schakelen
   metronomeOn = !metronomeOn;
-  const btn = e.currentTarget;
-  btn.classList.toggle('is-on', metronomeOn);
-  setIconLabel(btn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+  metronomeBtn.classList.toggle('is-on', metronomeOn);
+  setIconLabel(metronomeBtn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+});
+
+document.addEventListener('pointerdown', (e) => {
+  if (tempoPopover.hidden) return;
+  if (tempoPopover.contains(e.target) || metronomeBtn.contains(e.target)) return;
+  tempoPopover.hidden = true;
+});
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan pauzeert het automatisch
+// meescrollen (zie scrollStaffFollowPlayhead) en springt de speelpositie, 300ms
+// nadat je stopt met scrollen, naar wat er dan precies onder de (vaste) rode
+// speelstreep op 1/3 staat.
+document.querySelector('.staffWrap').addEventListener('scroll', () => {
+  const wrap = document.querySelector('.staffWrap');
+  if (wrap.scrollLeft === lastProgrammaticScrollLeft) return; // onze eigen auto-scroll
+  if (!playing) return;
+  if (!suppressAutoScroll) {
+    // Eerste scroll-event van deze sleepbeweging: meteen stil in plaats van het
+    // geluid van vóór het slepen te laten doorlopen, dat hoort toch niet meer
+    // bij het stuk dat nu in beeld staat.
+    scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+    scheduledSources = [];
+  }
+  suppressAutoScroll = true;
+  clearTimeout(userScrollTimer);
+  userScrollTimer = setTimeout(() => {
+    suppressAutoScroll = false;
+    seekTo(timeAtX(wrap.scrollLeft + wrap.clientWidth * PLAYHEAD_FRACTION));
+  }, SCROLL_SEEK_DELAY_MS);
 });
 
 document.getElementById('playBtn').addEventListener('click', async () => {
@@ -2178,7 +2875,7 @@ document.getElementById('restart').addEventListener('click', () => {
 // niet meer met de nieuwe breedte.
 window.addEventListener('resize', () => {
   if (playing) {
-    scrollStaffFollow(xAtTime((performance.now() - startT) / beatMs - COUNT_IN), idx > 0);
+    scrollStaffFollowPlayhead(xAtTime((performance.now() - startT) / beatMs - COUNT_IN));
   } else if (notes.length) {
     const anchorIdx = Math.min(idx, notes.length - 1);
     scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
