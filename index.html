@@ -959,10 +959,13 @@ function renderKeyboard(activeIdx) {
   svgEl.setAttribute('viewBox', `0 0 ${KEYBOARD_SVG_WIDTH} ${KEY_WHITE_H}`);
 
   const current = activeIdx < notes.length ? notes[activeIdx] : null;
-  const currentMidi = current ? current.midi : null;
+  // Een akkoord (nu ook mogelijk bij de rechterhand, zie detectChordMatch) licht al
+  // z'n toonhoogtes tegelijk op in plaats van maar één toets: currentMidis is dus
+  // altijd een array, ook voor een gewone losse noot (dan met 1 element).
+  const currentMidis = current ? (current.chord ? current.pitches.map(p => p.midi) : [current.midi]) : [];
   const contextMidis = currentContextMidis(activeIdx);
   const keyFill = (midi, whiteDefault) => {
-    if (midi === currentMidi) return '#8c73e8'; // rechterhand (R), te spelen
+    if (currentMidis.includes(midi)) return '#8c73e8'; // rechterhand (R), te spelen
     if (contextMidis.includes(midi)) return '#2dd4bf'; // linkerhand, alleen ter context
     return whiteDefault;
   };
@@ -972,7 +975,7 @@ function renderKeyboard(activeIdx) {
       x: k.x, y: 0, width: KEY_WHITE_W - 1, height: KEY_WHITE_H, rx: 3,
       fill: keyFill(k.midi, '#fff'), stroke: '#2b2640', 'stroke-width': 1
     }, svgEl);
-    if (k.midi === currentMidi) {
+    if (currentMidis.includes(k.midi)) {
       el('text', {
         x: k.x + (KEY_WHITE_W - 1) / 2, y: KEY_WHITE_H - 14, 'font-size': 14,
         'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
@@ -984,7 +987,7 @@ function renderKeyboard(activeIdx) {
       x: k.x, y: 0, width: KEY_BLACK_W, height: KEY_BLACK_H, rx: 2,
       fill: keyFill(k.midi, '#2b2640')
     }, svgEl);
-    if (k.midi === currentMidi) {
+    if (currentMidis.includes(k.midi)) {
       el('text', {
         x: k.x + KEY_BLACK_W / 2, y: KEY_BLACK_H - 9, 'font-size': 11,
         'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
@@ -1309,10 +1312,10 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     // elkaar overlappen; de bovenste van zo'n paar schuift daarom opzij, aan
     // dezelfde kant als de stok, zoals in gangbare notenschrift. Bij een losse
     // noot gebeurt hier niets (geen andere toonhoogte om mee te botsen).
-    // data-note-index/data-hand laten animateNoteHit() de notenkop van een
-    // juist geraakte rechterhandnoot terugvinden; bij een akkoord (alleen
-    // linkerhand) krijgt elke notenkop in het akkoord dezelfde twee, dat
-    // wordt daar nog niet gebruikt.
+    // data-note-index/data-hand laten animateNoteHit() de notenkop/noppen van een
+    // juist geraakte rechterhandnoot terugvinden; bij een akkoord krijgt elke
+    // notenkop in het akkoord dezelfde twee, en animeert animateNoteHit() ze dan
+    // ook allemaal (niet alleen de eerste).
     // Een beoordeelde noot (goed of gemist) kleurt helemaal in (notenkop én rand),
     // in plaats van alleen een gekleurde rand om een verder normale notenkop:
     // dat was in de praktijk te subtiel om in één oogopslag te zien. Geldt niet
@@ -1426,25 +1429,28 @@ function render() {
 // hertekent de hele notenbalk bij elke noot, dus deze animatie wordt apart
 // getriggerd nadat de notenbalk opnieuw getekend is, op precies die ene noot.
 function animateNoteHit(i) {
-  const notehead = document.querySelector(`#staff ellipse[data-note-index="${i}"][data-hand="R"]`);
-  if (!notehead) return;
+  // Bij een akkoord (nu ook mogelijk bij de rechterhand, zie detectChordMatch) delen
+  // alle notenkoppen van die noot dezelfde data-note-index: animeer ze dan allemaal,
+  // niet alleen de eerste.
+  const noteheads = document.querySelectorAll(`#staff ellipse[data-note-index="${i}"][data-hand="R"]`);
+  noteheads.forEach(notehead => {
+    notehead.style.transformBox = 'fill-box';
+    notehead.style.transformOrigin = 'center';
+    notehead.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(1.6)', offset: 0.3 }, { transform: 'scale(1)' }],
+      { duration: 380, easing: 'ease-out' }
+    );
 
-  notehead.style.transformBox = 'fill-box';
-  notehead.style.transformOrigin = 'center';
-  notehead.animate(
-    [{ transform: 'scale(1)' }, { transform: 'scale(1.6)', offset: 0.3 }, { transform: 'scale(1)' }],
-    { duration: 380, easing: 'ease-out' }
-  );
-
-  const cx = notehead.getAttribute('cx'), cy = notehead.getAttribute('cy');
-  const ring = el('circle', { cx, cy, r: 8 * STAFF_SCALE, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3 * STAFF_SCALE, opacity: 0.9 });
-  ring.style.transformBox = 'fill-box';
-  ring.style.transformOrigin = 'center';
-  const anim = ring.animate(
-    [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(3.2)', opacity: 0 }],
-    { duration: 450, easing: 'ease-out' }
-  );
-  anim.onfinish = () => ring.remove();
+    const cx = notehead.getAttribute('cx'), cy = notehead.getAttribute('cy');
+    const ring = el('circle', { cx, cy, r: 8 * STAFF_SCALE, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3 * STAFF_SCALE, opacity: 0.9 });
+    ring.style.transformBox = 'fill-box';
+    ring.style.transformOrigin = 'center';
+    const anim = ring.animate(
+      [{ transform: 'scale(1)', opacity: 0.9 }, { transform: 'scale(3.2)', opacity: 0 }],
+      { duration: 450, easing: 'ease-out' }
+    );
+    anim.onfinish = () => ring.remove();
+  });
 }
 
 // Schuift de notenbalk automatisch mee: de huidige noot komt links in beeld,
@@ -1476,15 +1482,26 @@ function scrollStaffFollowPlayhead(x) {
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
-// tEvent: moment (performance.now) waarop de noot begon. Null in oefenmodus.
-function onHeard(midi, tEvent) {
+// heard: één toonhoogte (losse noot, van de monofone detectoren) of een array van
+// toonhoogtes (akkoord, van advanceChordState/detectChordMatch). tEvent: moment
+// (performance.now) waarop de noot/het akkoord begon. Null in oefenmodus.
+function onHeard(heard, tEvent) {
   if (idx >= notes.length) return;
   const target = notes[idx];
-  const diff = midi - target.midi;
-  const samePitchClass = ((diff % 12) + 12) % 12 === 0;
-  const exactOctave = diff === 0;
+  const heardMidis = Array.isArray(heard) ? heard : [heard];
+  const targetMidis = target.chord ? target.pitches.map(p => p.midi) : [target.midi];
+  const heardLabel = heardMidis.map(midiToLabel).join('+');
   // Bij "advanced" telt alleen de exacte octaaf, niet elke octaaf van dezelfde toon.
-  const pitchOk = difficulty.octaveStrict ? exactOctave : samePitchClass;
+  // Bij een akkoord is dit sowieso altijd exact: detectChordMatch() herkent alleen de
+  // precieze verwachte toonhoogtes (zie de uitleg daar), dus heardMidis is dan al
+  // gelijk aan targetMidis tegen de tijd dat deze functie wordt aangeroepen.
+  const matchOne = (tm, hm) => {
+    const diff = hm - tm;
+    const exact = diff === 0;
+    return difficulty.octaveStrict ? exact : ((diff % 12) + 12) % 12 === 0;
+  };
+  const pitchOk = targetMidis.every(tm => heardMidis.some(hm => matchOne(tm, hm)));
+  const exactOctave = targetMidis.every(tm => heardMidis.includes(tm));
 
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
@@ -1504,7 +1521,7 @@ function onHeard(midi, tEvent) {
     } else {
       wrongs++;
       streak = 0;
-      setFeedback(`Je speelde ${midiToLabel(midi)}, de volgende is ${target.label} met R${target.finger}`, 'bad');
+      setFeedback(`Je speelde ${heardLabel}, de volgende is ${target.label} met R${target.finger}`, 'bad');
     }
     updateStats();
     return;
@@ -1522,7 +1539,7 @@ function onHeard(midi, tEvent) {
   if (!pitchOk) {
     wrongs++;
     streak = 0;
-    setFeedback(`Verkeerde noot: je speelde ${midiToLabel(midi)}, nu is ${target.label} met R${target.finger} aan de beurt`, 'bad');
+    setFeedback(`Verkeerde noot: je speelde ${heardLabel}, nu is ${target.label} met R${target.finger} aan de beurt`, 'bad');
     updateStats();
     return;
   }
@@ -1721,7 +1738,7 @@ function scheduleNotesFromBeat(fromBeat, audioStart, beatSec) {
     noteList.forEach(n => {
       const when = audioStart + (n.start - fromBeat) * beatSec;
       const dur = n.dur * beatSec * 0.85;
-      // Akkoord (alleen linkerhand, zie SONGS-uitleg): alle toonhoogtes tegelijk.
+      // Akkoord: alle toonhoogtes tegelijk.
       if (n.chord) {
         n.pitches.forEach(p => scheduleNoteSound(p.midi, when, dur));
       } else {
@@ -1996,6 +2013,22 @@ async function startMic() {
     analyser.fftSize = 2048;
     src.connect(analyser);
     buf = new Float32Array(analyser.fftSize);
+    // Losse, grotere analyser voor akkoordherkenning (zie detectChordMatch): die werkt
+    // in het frequentiedomein en wil juist een hogere frequentieresolutie (een langer
+    // venster), terwijl de twee monofone detectoren hierboven bewust een kort venster
+    // willen voor snelle, nauwkeurige periodedetectie van één toon. Dezelfde bron (src)
+    // kan beide analysers voeden.
+    chordAnalyser = audioCtx.createAnalyser();
+    chordAnalyser.fftSize = CHORD_FFT_SIZE;
+    // Geen tijd-smoothing (standaard 0.8): dat middelt een reeks metingen in de tijd,
+    // wat de piekniveaus van een net gespeeld akkoord kunstmatig verzwakt, vooral
+    // vlak na het begin van een analyser (of een nieuwe toon) als het nog over een
+    // grotendeels stille voorgeschiedenis middelt. We willen juist steeds het echte
+    // niveau van dít moment, CONFIRM_MS/detectChordMatch doet de stabiliteitscontrole
+    // zelf al over de tijd.
+    chordAnalyser.smoothingTimeConstant = 0;
+    src.connect(chordAnalyser);
+    chordFreqData = new Float32Array(chordAnalyser.frequencyBinCount);
     micOn = true;
     const micBtnEl = document.getElementById('micBtn');
     micBtnEl.classList.add('is-on');
@@ -2095,6 +2128,74 @@ function centsBetween(f1, f2) {
   return 1200 * Math.log2(f1 / f2);
 }
 
+// ---------- Akkoordherkenning (alleen rechterhand, zie SONGS/"Lied toevoegen") ----------
+// De twee monofone detectoren hierboven geven één beste toonhoogte terug: voor een
+// akkoord (meerdere toonhoogtes tegelijk) is dat geen zinnig antwoord. In plaats van
+// blind te proberen alle spelende tonen te raden (polyfone transcriptie in het echt,
+// veel feilbaarder, vooral met harmonischen die op een andere verwachte toon kunnen
+// lijken), checken we GERICHT of de toonhoogtes die we al verwachten er met genoeg
+// energie staan: we weten tenslotte al welk akkoord er moet klinken.
+let chordAnalyser = null, chordFreqData = null;
+// Hogere frequentieresolutie dan de monofone analyser (2048): bij lage noten liggen
+// halve tonen maar een paar Hz uit elkaar (B2 en C3 bijvoorbeeld maar 7,3Hz). Bleek in
+// de praktijk pas bij 32768 (±1,35Hz per bin) ruim genoeg: bij 8192 (±5,4Hz per bin)
+// overlapte het zoekvenster van de ene verwachte toon soms al met de buurtoon ernaast,
+// waardoor een akkoord met een niet-gespeelde buurtoon er toch leek te staan. Dat
+// maakt het analysevenster ruim 740ms lang (32768/44100): een akkoord moet dus wel
+// even worden vastgehouden voor een schone meting, geen probleem voor hoe lang een
+// akkoord normaal al wordt aangeslagen.
+const CHORD_FFT_SIZE = 32768;
+const CHORD_PEAK_MIN_DB = -65;         // onder dit niveau geldt een bin als stilte
+const CHORD_PEAK_PROMINENCE_DB = 10;  // moet dit duidelijk boven de algemene ruisvloer uitsteken
+const CHORD_TOLERANCE_CENTS = 35;     // speling rond de exacte frequentie (minder dan een kwarttoon)
+
+// Ruisvloer-schatting voor dit frame: de mediaan van het hele spectrum. Bewust geen
+// buren van de losse doelfrequentie (dat leek eerst logischer), want bij een akkoord
+// met dicht bijeen liggende lage noten (bijvoorbeeld een drieklank rond C3, nog geen
+// 35Hz uit elkaar) valt de buur van de ene verwachte toon al snel middenin de piek
+// van een andere verwachte toon: dan lijkt de eerste toon ineens niet prominent
+// genoeg, terwijl er niets mis is. De mediaan over het hele spectrum (vooral stille
+// bins, ook tijdens een akkoord) is daar ongevoelig voor.
+function spectralNoiseFloor(freqData) {
+  const sorted = Float32Array.from(freqData).sort();
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+// Is er, rond doelfrequentie targetFreq, een duidelijke piek in het spectrum (niet
+// zomaar een hoge vloer overal)? We zoeken gericht in een smal venster rond de
+// verwachte frequentie, geen piekdetectie over het hele spectrum: we weten al welke
+// toonhoogte we zoeken.
+function hasSpectralPeakNear(freqData, sr, fftSize, targetFreq, floor) {
+  const binHz = sr / fftSize;
+  const lo = targetFreq * Math.pow(2, -CHORD_TOLERANCE_CENTS / 1200);
+  const hi = targetFreq * Math.pow(2, CHORD_TOLERANCE_CENTS / 1200);
+  const loBin = Math.max(0, Math.floor(lo / binHz));
+  const hiBin = Math.min(freqData.length - 1, Math.ceil(hi / binHz));
+  let peakDb = -Infinity;
+  for (let b = loBin; b <= hiBin; b++) peakDb = Math.max(peakDb, freqData[b]);
+  if (peakDb < CHORD_PEAK_MIN_DB) return false;
+  return peakDb - floor >= CHORD_PEAK_PROMINENCE_DB;
+}
+
+// expectedMidis: de toonhoogtes die dit akkoord moet bevatten. Geeft terug hoeveel
+// daarvan daadwerkelijk met genoeg energie aanwezig zijn, en of dat er allemaal zijn
+// (matched). Akkoorden tellen altijd op de exacte octaaf (geen "elke octaaf van
+// dezelfde toon telt ook" zoals bij een losse noot in Beginner/Medior): bij meerdere
+// gelijktijdige tonen is dat te onbetrouwbaar, de boventonen van de ene toon vallen
+// al snel samen met een verwachte andere toon een octaaf hoger.
+function detectChordMatch(expectedMidis) {
+  if (!chordAnalyser) return { matched: false, matchCount: 0 };
+  chordAnalyser.getFloatFrequencyData(chordFreqData);
+  const sr = audioCtx.sampleRate;
+  const floor = spectralNoiseFloor(chordFreqData);
+  let matchCount = 0;
+  expectedMidis.forEach(midi => {
+    const freq = 440 * Math.pow(2, (midi - 69 + calibrationOffset) / 12);
+    if (hasSpectralPeakNear(chordFreqData, sr, CHORD_FFT_SIZE, freq, floor)) matchCount++;
+  });
+  return { matched: matchCount === expectedMidis.length, matchCount };
+}
+
 // ---------- Herkenning van een gespeelde noot: twee detectoren plus een state machine ----------
 // Opzet geïnspireerd op kotokur/note-detector-stave (BSD 2-Clause, Copyright (c) 2020 Alex Pankratov,
 // https://github.com/kotokur/note-detector-stave): pas een toon vertrouwen als twee onafhankelijke
@@ -2109,6 +2210,7 @@ let noteCandidateSince = 0;
 let noteSilenceSince = 0;
 let pendingCandidate = null; // afwijkende meting die nog niet vaak genoeg is herhaald
 let pendingCount = 0;
+let chordCandidateSince = 0; // zie advanceChordState
 
 function resetNoteDetection() {
   noteState = 'searching';
@@ -2117,6 +2219,23 @@ function resetNoteDetection() {
   noteSilenceSince = 0;
   pendingCandidate = null;
   pendingCount = 0;
+  chordCandidateSince = 0;
+}
+
+// Eigen, eenvoudiger state machine voor een akkoord: in tegenstelling tot een losse
+// noot hoeven we niet uit te zoeken WELKE toonhoogte(s) er klinken (dat kan sowieso
+// niet zinnig in één enkel antwoord bij meerdere tonen tegelijk) - detectChordMatch()
+// checkt al gericht of precies het verwachte akkoord aanwezig is. Hier hoeft dus alleen
+// diezelfde ja/nee-uitkomst een paar tellingen stabiel te blijven (CONFIRM_MS, dezelfde
+// marge als bij een losse noot) voor hij telt.
+function advanceChordState(matched, now) {
+  if (!matched) { chordCandidateSince = 0; return; }
+  if (!chordCandidateSince) chordCandidateSince = now;
+  if (now - chordCandidateSince >= CONFIRM_MS) {
+    const since = chordCandidateSince;
+    chordCandidateSince = 0;
+    if (idx < notes.length) onHeard(notes[idx].pitches.map(p => p.midi), since);
+  }
 }
 
 // ---------- Volumemeter: laat zien of er überhaupt geluid binnenkomt ----------
@@ -2183,10 +2302,57 @@ function updateLiveMarker(f1, f2, midi) {
   liveLabel.setAttribute('opacity', 1);
 }
 
+// Zelfde live-indicator, maar voor een akkoord-doel: geen los gehoord-toonhoogte om te
+// tonen (zie detectChordMatch), dus laten we in plaats daarvan zien hoeveel van de
+// verwachte toonhoogtes al klinken (bv. "2/3"). Teal zodra ze er allemaal zijn, amber
+// zolang het er een paar maar niet alle zijn, net als het onderscheid bij een losse noot.
+function updateLiveMarkerChord(matchCount, total, target) {
+  if (!liveMarker || !liveLabel) return;
+  if (matchCount === 0) {
+    if (performance.now() < liveMarkerHoldUntil) return;
+    liveMarker.setAttribute('opacity', 0);
+    liveLabel.setAttribute('opacity', 0);
+    return;
+  }
+  liveMarkerHoldUntil = performance.now() + 500;
+
+  const topStep = Math.max(...target.pitches.map(p => p.step));
+  const y = yOf(topStep);
+  const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
+  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20 * STAFF_SCALE;
+  const color = matchCount === total ? '#2dd4bf' : '#f5a623';
+
+  liveMarker.setAttribute('cx', x);
+  liveMarker.setAttribute('cy', y);
+  liveMarker.setAttribute('fill', color);
+  liveMarker.setAttribute('opacity', 1);
+
+  liveLabel.setAttribute('x', x);
+  liveLabel.setAttribute('y', y - 14);
+  liveLabel.setAttribute('fill', color);
+  liveLabel.textContent = matchCount === total ? target.label : `${matchCount}/${total}`;
+  liveLabel.setAttribute('opacity', 1);
+}
+
 function listen() {
   if (!analyser) return;
   analyser.getFloatTimeDomainData(buf);
   updateVolMeter(computeRms(buf));
+
+  // Een akkoord-doel (alleen rechterhand, zie "Lied toevoegen") loopt via een heel
+  // andere herkenning (detectChordMatch, frequentiedomein, gericht op de verwachte
+  // toonhoogtes) dan de twee monofone detectoren hieronder, die voor precies één
+  // toonhoogte tegelijk zijn gebouwd.
+  const target = idx < notes.length ? notes[idx] : null;
+  if (target && target.chord) {
+    const expectedMidis = target.pitches.map(p => p.midi);
+    const { matched, matchCount } = detectChordMatch(expectedMidis);
+    document.getElementById('heard').textContent = matchCount > 0 ? `Gehoord: ${matchCount}/${expectedMidis.length} van ${target.label}` : 'Gehoord: -';
+    updateLiveMarkerChord(matchCount, expectedMidis.length, target);
+    advanceChordState(matched, performance.now());
+    return;
+  }
+
   const f1 = detectPitch(buf, audioCtx.sampleRate);
   const f2 = detectPitchYIN(buf, audioCtx.sampleRate);
 
@@ -2408,14 +2574,14 @@ function createPitchGroup(opts = {}) {
   return { span, letterSel, accSel, octSel };
 }
 
-// handPrefix 'L' (linkerhand) mag akkoorden: met "+ akkoord" krijgt deze tel
-// een extra toonhoogte die er tegelijk mee klinkt. De rechterhand (die de
-// microfoon beoordeelt, en die maar één toon tegelijk herkent) blijft één
-// toon per tel, dus krijgt die knop niet.
+// Met "+ akkoord" krijgt deze tel een extra toonhoogte die er tegelijk mee klinkt,
+// bij beide handen: de rechterhand wordt dan niet meer met de twee monofone
+// detectoren beoordeeld maar met detectChordMatch() (zie daar), dat gericht checkt
+// of alle toonhoogtes van het akkoord tegelijk klinken.
 function createNoteRow(opts = {}, handPrefix = 'R') {
   const row = document.createElement('div');
   row.className = 'noteRow';
-  const allowChord = handPrefix === 'L';
+  const allowChord = true;
 
   const num = document.createElement('span');
   num.className = 'rowNum';
