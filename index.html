@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano prototype</title>
+<style>
+  :root { --bg:#f7f5f0; --ink:#222; --muted:#777; --ok:#2e9e5b; --bad:#d64545; --accent:#3b6fd4; --line:#e6e2d8; --c:#e8832a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+  .stats { display:flex; gap:12px; margin-bottom:16px; }
+  .stat { background:#fff; border-radius:12px; padding:10px 14px; flex:1; border:1px solid var(--line); }
+  .stat b { display:block; font-size:20px; }
+  .stat span { font-size:12px; color:var(--muted); }
+  .card { background:#fff; border-radius:14px; padding:16px; border:1px solid var(--line); }
+  svg { width:100%; height:auto; display:block; }
+  .progress { height:8px; background:var(--line); border-radius:4px; margin-top:12px; overflow:hidden; }
+  .progress div { height:100%; background:var(--ok); width:0; transition: width .3s; }
+  .feedback { font-weight:600; min-height:24px; margin-top:10px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  .controls { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+  select, button { font-size:15px; border-radius:10px; padding:10px 16px; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
+  button:disabled { background:#bbb; cursor:default; }
+  #playBtn { background:var(--ok); }
+  select { border:1px solid var(--line); background:#fff; }
+  .heard { font-size:14px; color:var(--muted); }
+  .legend { font-size:13px; color:var(--muted); margin-top:10px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+  .warn { font-size:13px; color:#8a5a00; background:#fff6e0; border-radius:10px; padding:10px 12px; margin-top:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Speel het volgende</h1>
+  <p class="sub">Oefen zonder tijd, of speel af mee met de balk. De microfoon luistert naar je piano.</p>
+
+  <div class="stats">
+    <div class="stat"><b id="xp">0</b><span>XP</span></div>
+    <div class="stat"><b id="streak">0</b><span>Reeks</span></div>
+    <div class="stat"><b id="stars">0</b><span>Sterren</span></div>
+  </div>
+
+  <div class="card">
+    <svg id="staff" viewBox="0 0 600 240"></svg>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
+    <div class="legend">
+      <i style="background:#e8832a"></i>C-noten &nbsp;
+      <i style="background:#333"></i>overige noten &nbsp;
+      R1 t/m R5 = rechter hand, vinger 1 t/m 5
+    </div>
+    <div class="controls">
+      <select id="song"></select>
+      <button id="micBtn">Microfoon aan</button>
+      <button id="playBtn">Speel af</button>
+      <button id="restart">Opnieuw</button>
+      <span class="heard" id="heard">Gehoord: -</span>
+    </div>
+  </div>
+
+  <div class="warn" id="draftWarn" hidden></div>
+</main>
+
+<script>
+// ---------- Liederen (losse data, makkelijk aan te vullen) ----------
+// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf.
+// fingers: rechterhandvinger per noot (1 = duim, 5 = pink).
+// bpm: tempo voor "Speel af". Elke noot duurt hier één tel.
+// draft: true betekent dat de noten en vingerzetting nog niet zijn gecontroleerd.
+const SONGS = [
+  {
+    id: 'ode',
+    title: 'Ode an de vreugde (Beethoven)',
+    bpm: 90,
+    draft: false,
+    notes:   ['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'],
+    fingers: [ 3,   3,   4,   5,   5,   4,   3,   2,   1,   1,   2,   3,   3,   2,   2 ]
+  },
+  {
+    id: 'gymno',
+    title: 'Gymnopédie nr. 1 (Satie), eerste frase',
+    bpm: 60,
+    draft: true,
+    notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
+    fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
+  }
+];
+
+// ---------- Constanten voor timing ----------
+const COUNT_IN = 4;   // tellen voordat de balk start (in tellen)
+const WINDOW   = 0.5; // acceptatievenster rond een noot, in tellen
+
+// ---------- Notenhulpjes ----------
+const LETTERS = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
+const SEMI    = [0, 2, 4, 5, 7, 9, 11];
+const NAME_PC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function parseNote(n) {
+  const letter = n[0];
+  const accidental = n.length === 3 ? n[1] : '';
+  const octave = parseInt(n[n.length - 1], 10);
+  const base = (octave + 1) * 12 + SEMI[LETTERS[letter]];
+  const midi = base + (accidental === '#' ? 1 : 0);
+  const step = octave * 7 + LETTERS[letter];
+  return { midi, step, label: n, letter };
+}
+function midiToLabel(m) {
+  return NAME_PC[m % 12] + (Math.floor(m / 12) - 1);
+}
+
+// ---------- Staf tekenen ----------
+const svgNS = 'http://www.w3.org/2000/svg';
+const staff = document.getElementById('staff');
+function el(tag, attrs, parent = staff) {
+  const e = document.createElementNS(svgNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+}
+const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
+const xOf = i => 110 + i * 34;
+
+// ---------- Spelstatus ----------
+let song = SONGS[0];
+let notes = [];
+let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
+let playing = false, startT = 0, beatMs = 667, rafId = null;
+let phRect = null;
+
+function loadSong(s) {
+  stopPlay(false);
+  song = s;
+  beatMs = 60000 / s.bpm;
+  notes = s.notes.map((n, i) => ({ ...parseNote(n), finger: s.fingers[i], start: i }));
+  idx = 0; wrongs = 0; streak = 0;
+  document.getElementById('title').textContent = s.title;
+  const warn = document.getElementById('draftWarn');
+  warn.hidden = !s.draft;
+  warn.textContent = 'Let op: deze noten en vingerzetting zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
+  document.getElementById('restart').disabled = true;
+  setFeedback('Speel de eerste noot, of druk op Speel af.', '');
+  render();
+  updateStats();
+}
+
+function setFeedback(text, cls) {
+  const f = document.getElementById('feedback');
+  f.textContent = text;
+  f.className = 'feedback ' + (cls || '');
+}
+
+function updateStats() {
+  document.getElementById('xp').textContent = xp;
+  document.getElementById('streak').textContent = streak;
+  document.getElementById('stars').textContent = totalStars;
+  const pct = notes.length ? (idx / notes.length) * 100 : 0;
+  document.getElementById('bar').style.width = pct + '%';
+}
+
+function render() {
+  staff.innerHTML = '';
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:590, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' });
+  clef.textContent = '\u{1D11E}';
+
+  // Speelbalk eerst tekenen, zodat de noten erboven liggen.
+  phRect = el('rect', { x:0, y:58, width:34, height:136, fill:'#3b6fd4', opacity:0 });
+
+  notes.forEach((n, i) => {
+    const x = xOf(i);
+    const y = yOf(n.step);
+    const isC = n.letter === 'C';
+    const fill = isC ? '#e8832a' : '#333';
+    const done = i < idx;
+    const current = i === idx;
+    const opacity = (done || current) ? 1 : 0.45;
+    const stroke = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
+
+    if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#333', 'stroke-width':1.5 });
+    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity, stroke, 'stroke-width':2.5 });
+    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity, 'stroke-width':1.6 });
+
+    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity });
+    finger.textContent = 'R' + n.finger;
+  });
+
+  const label = el('text', { x:300, y:236, 'font-size':16, 'text-anchor':'middle', fill:'#555' });
+  label.textContent = idx < notes.length
+    ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
+    : 'Klaar!';
+}
+
+// ---------- Beoordeling van een gehoorde noot ----------
+// tEvent: moment (performance.now) waarop de noot begon. Null in oefenmodus.
+function onHeard(midi, tEvent) {
+  if (idx >= notes.length) return;
+  const target = notes[idx];
+  const diff = midi - target.midi;
+  const samePitchClass = ((diff % 12) + 12) % 12 === 0;
+
+  // Oefenmodus: alleen de juiste toon telt, geen tijd.
+  if (!playing) {
+    if (samePitchClass) {
+      const bonus = diff === 0 ? 10 : 6;
+      xp += bonus;
+      streak++;
+      if (streak >= 5) xp += 5;
+      idx++;
+      setFeedback(`Goed! +${bonus} XP${diff === 0 ? '' : ' (andere octaaf telt ook)'}`, 'ok');
+      if (idx === notes.length) finish();
+      else render();
+    } else {
+      wrongs++;
+      streak = 0;
+      setFeedback(`Je speelde ${midiToLabel(midi)}, de volgende is ${target.label} met R${target.finger}`, 'bad');
+    }
+    updateStats();
+    return;
+  }
+
+  // Speel af: noot telt alleen binnen het venster rond de balk.
+  const t = (tEvent - startT) / beatMs - COUNT_IN;
+  if (t < target.start - WINDOW) {
+    setFeedback(`Te vroeg. Wacht tot de balk bij ${target.label} is.`, 'bad');
+    return;
+  }
+  if (t > target.start + WINDOW) return; // wordt door tick als gemist gemarkeerd
+
+  if (!samePitchClass) {
+    wrongs++;
+    streak = 0;
+    setFeedback(`Verkeerde noot: je speelde ${midiToLabel(midi)}, nu is ${target.label} met R${target.finger} aan de beurt`, 'bad');
+    updateStats();
+    return;
+  }
+
+  const off = t - target.start;
+  const perfect = Math.abs(off) <= 0.15;
+  const bonus = (diff === 0 ? 10 : 6) + (perfect ? 5 : 0);
+  xp += bonus;
+  streak++;
+  if (streak >= 5) xp += 5;
+  idx++;
+  const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
+  setFeedback(`${timing}! +${bonus} XP`, 'ok');
+
+  if (idx === notes.length) stopPlay(true);
+  else { render(); updateStats(); }
+}
+
+function finish() {
+  const stars = wrongs === 0 ? 3 : wrongs <= 2 ? 2 : 1;
+  totalStars += stars;
+  setFeedback(`Klaar! ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, 'ok');
+  document.getElementById('restart').disabled = false;
+  updateStats();
+}
+
+// ---------- Speel af: balk loopt over de noten ----------
+function startPlay() {
+  stopPlay(false);
+  idx = 0; wrongs = 0; streak = 0;
+  playing = true;
+  startT = performance.now();
+  document.getElementById('playBtn').textContent = 'Stop';
+  document.getElementById('restart').disabled = true;
+  setFeedback('Tel mee...', '');
+  render();
+  updateStats();
+  rafId = requestAnimationFrame(tick);
+}
+
+function tick(now) {
+  if (!playing) return;
+  const t = (now - startT) / beatMs - COUNT_IN;
+
+  if (t < 0) {
+    const countdown = Math.ceil(-t);
+    setFeedback(`Tel mee... ${countdown}`, '');
+    phRect.setAttribute('opacity', 0);
+  } else {
+    // Noten die voorbij het venster zijn, tellen als gemist.
+    let missed = false;
+    while (idx < notes.length && t > notes[idx].start + WINDOW) {
+      const m = notes[idx];
+      wrongs++;
+      streak = 0;
+      idx++;
+      missed = true;
+      setFeedback(`Gemist: ${m.label} met R${m.finger}`, 'bad');
+    }
+    if (missed) { render(); updateStats(); }
+
+    if (idx >= notes.length) {
+      stopPlay(true);
+      return;
+    }
+    const x = xOf(0) + t * 34 - 17;
+    phRect.setAttribute('x', x);
+    phRect.setAttribute('opacity', 0.18);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function stopPlay(completed) {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  const was = playing;
+  playing = false;
+  document.getElementById('playBtn').textContent = 'Speel af';
+  if (!was) return;
+  if (completed) finish();
+  else setFeedback('Gestopt.', '');
+  render();
+  updateStats();
+}
+
+// ---------- Microfoon en toonhoogte ----------
+let audioCtx = null, analyser = null, buf = null, micOn = false, listenTimer = null;
+
+async function startMic() {
+  if (micOn) return true;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+    });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    src.connect(analyser);
+    buf = new Float32Array(analyser.fftSize);
+    micOn = true;
+    document.getElementById('micBtn').textContent = 'Microfoon actief';
+    document.getElementById('micBtn').disabled = true;
+    listenTimer = setInterval(listen, 60);
+    return true;
+  } catch (err) {
+    setFeedback('Geen toegang tot de microfoon. Open de pagina via localhost of https en geef toestemming.', 'bad');
+    return false;
+  }
+}
+
+// Autocorrelatie: geeft de grondfrequentie terug, of null bij stilte/onzeker signaal.
+function detectPitch(b, sr) {
+  let rms = 0;
+  for (let i = 0; i < b.length; i++) rms += b[i] * b[i];
+  rms = Math.sqrt(rms / b.length);
+  if (rms < 0.008) return null;
+
+  const minLag = Math.floor(sr / 1000);
+  const maxLag = Math.floor(sr / 80);
+  const n = b.length;
+  const norms = new Float32Array(maxLag + 2);
+  let best = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let corr = 0, e1 = 0, e2 = 0;
+    for (let i = 0; i < n - lag; i++) {
+      corr += b[i] * b[i + lag];
+      e1 += b[i] * b[i];
+      e2 += b[i + lag] * b[i + lag];
+    }
+    const norm = corr / Math.sqrt(e1 * e2 + 1e-9);
+    norms[lag] = norm;
+    if (norm > best) best = norm;
+  }
+  if (best < 0.85) return null;
+
+  // Kies de kortste lag die bijna de beste piek haalt, zo vermijd je octaaf-fouten.
+  for (let lag = minLag + 1; lag < maxLag; lag++) {
+    if (norms[lag] >= 0.9 * best && norms[lag] >= norms[lag - 1] && norms[lag] >= norms[lag + 1]) {
+      return sr / lag;
+    }
+  }
+  return null;
+}
+
+let candidate = null, count = 0, candidateStart = 0, armed = true;
+
+function listen() {
+  if (!analyser) return;
+  analyser.getFloatTimeDomainData(buf);
+  const f = detectPitch(buf, audioCtx.sampleRate);
+  if (!f) {
+    candidate = null; count = 0; armed = true;
+    document.getElementById('heard').textContent = 'Gehoord: -';
+    return;
+  }
+  const midi = Math.round(69 + 12 * Math.log2(f / 440));
+  document.getElementById('heard').textContent = `Gehoord: ${midiToLabel(midi)}`;
+
+  if (midi === candidate) {
+    count++;
+  } else {
+    candidate = midi;
+    count = 1;
+    candidateStart = performance.now();
+    armed = true;
+  }
+
+  // Drie opeenvolgende frames met dezelfde toonhoogte = een stabiele noot.
+  if (count === 3 && armed) {
+    armed = false;
+    if (idx < notes.length) onHeard(midi, candidateStart);
+  }
+}
+
+// ---------- Knoppen ----------
+const songSelect = document.getElementById('song');
+SONGS.forEach((s, i) => {
+  const o = document.createElement('option');
+  o.value = i;
+  o.textContent = s.title;
+  songSelect.appendChild(o);
+});
+songSelect.addEventListener('change', () => loadSong(SONGS[songSelect.value]));
+
+document.getElementById('micBtn').addEventListener('click', async () => {
+  const ok = await startMic();
+  if (ok) setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
+});
+
+document.getElementById('playBtn').addEventListener('click', async () => {
+  if (playing) { stopPlay(false); return; }
+  const ok = await startMic();
+  if (ok) startPlay();
+});
+
+document.getElementById('restart').addEventListener('click', () => {
+  loadSong(song);
+});
+
+loadSong(song);
+</script>
+</body>
+</html>
