@@ -25,7 +25,12 @@
     --radius-s:8px; --radius-m:14px; --radius-l:20px; --radius-pill:999px;
   }
   * { box-sizing: border-box; }
-  html, body { width:100%; }
+  /* overflow-x:hidden als vangnet: voorkomt dat decoratieve elementen die net
+     iets buiten hun knop uitsteken (bijvoorbeeld een brede tooltip, gecentreerd
+     op een kleine knop) de hele pagina zijwaarts scrollbaar maken. Alles wat
+     binnen de viewport past blijft gewoon zichtbaar, dit raakt alleen de
+     scrollbaarheid van de pagina zelf. */
+  html, body { width:100%; overflow-x:hidden; }
   body {
     margin:0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%);
@@ -85,7 +90,9 @@
   .staffWrap::-webkit-scrollbar { height:8px; }
   .staffWrap::-webkit-scrollbar-track { background:transparent; }
   .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
-  svg { display:block; width:100%; min-width:600px; height:auto; }
+  /* Alleen de echte notenbalken scrollen/schalen zo breed; icoon-svg's in
+     knoppen moeten gewoon hun eigen kleine formaat houden. */
+  #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
   .scrollHint { font-size:12px; color:var(--muted); margin:var(--space-1) 0 0; text-align:center; }
 
   .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
