@@ -43,9 +43,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina. Naast
   "Speel af" staat een los icoontje dat altijd met pianogeluid afspeelt, ook als "Met geluid"
   in de instellingen uit staat.
-- De notenbalk scrollt automatisch mee met de voortgang: tijdens "Speel af" volgt hij de
-  speelstreep, in oefenmodus elke nieuwe noot. De huidige noot komt links in beeld met nog 1
-  oude noot ervoor als context.
+- De notenbalk scrollt automatisch mee met de voortgang. Tijdens "Speel af" staat de rode
+  speelstreep vast op 1/3 van het zichtbare stuk (`PLAYHEAD_FRACTION`, in `scrollStaffFollowPlayhead()`):
+  de notenbalk schuift daar continu onderdoor, als een pianorol. Scrol je zelf tijdens het
+  spelen, dan pauzeert het automatisch meescrollen; 300ms na het loslaten springt de
+  speelpositie naar wat er dan onder die 1/3-lijn staat (`seekTo()`, zonder de score te
+  resetten). In oefenmodus (geen speelstreep) komt de huidige noot nog links in beeld met 1
+  oude noot ervoor als context (`scrollStaffFollow()`, de oorspronkelijke functie).
 - De live-indicator blijft minstens een halve seconde zichtbaar na het laatste signaal, in
   plaats van meteen te verdwijnen zodra de toon wegvalt.
 - Oefenmodus: alleen toonhoogte, zonder tijd.

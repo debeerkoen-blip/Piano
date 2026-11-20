@@ -1266,6 +1266,21 @@ function scrollStaffFollow(x, hasPrevious) {
   lastProgrammaticScrollLeft = wrap.scrollLeft;
 }
 
+// Tijdens "Speel af": de speelstreep blijft vast op 1/3 van het zichtbare stuk
+// staan (de "startstand"), de notenbalk schuift daar continu onderdoor, zoals
+// een pianorol. PLAYHEAD_FRACTION is diezelfde 1/3 voor zowel het scrollen hier
+// als het terugrekenen bij handmatig scrollen (zie de scroll-listener onderaan).
+const PLAYHEAD_FRACTION = 1 / 3;
+function scrollStaffFollowPlayhead(x) {
+  if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
+  const wrap = document.querySelector('.staffWrap');
+  if (!wrap) return;
+  const target = x - wrap.clientWidth * PLAYHEAD_FRACTION;
+  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+  wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  lastProgrammaticScrollLeft = wrap.scrollLeft;
+}
+
 // ---------- Beoordeling van een gehoorde noot ----------
 // tEvent: moment (performance.now) waarop de noot begon. Null in oefenmodus.
 function onHeard(midi, tEvent) {
@@ -1687,7 +1702,7 @@ function tick(now) {
     const x = xAtTime(t);
     phRect.setAttribute('x', x - 1.5);
     phRect.setAttribute('opacity', 1);
-    scrollStaffFollow(x, idx > 0);
+    scrollStaffFollowPlayhead(x);
   }
   rafId = requestAnimationFrame(tick);
 }
@@ -2542,8 +2557,9 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 // Scrol je tijdens Speel af zelf over de notenbalk, dan pauzeert het automatisch
-// meescrollen (zie scrollStaffFollow) en springt de speelpositie, 300ms nadat je
-// stopt met scrollen, mee naar de plek waar je naartoe scrolde.
+// meescrollen (zie scrollStaffFollowPlayhead) en springt de speelpositie, 300ms
+// nadat je stopt met scrollen, naar wat er dan precies onder de (vaste) rode
+// speelstreep op 1/3 staat.
 document.querySelector('.staffWrap').addEventListener('scroll', () => {
   const wrap = document.querySelector('.staffWrap');
   if (wrap.scrollLeft === lastProgrammaticScrollLeft) return; // onze eigen auto-scroll
@@ -2552,7 +2568,7 @@ document.querySelector('.staffWrap').addEventListener('scroll', () => {
   clearTimeout(userScrollTimer);
   userScrollTimer = setTimeout(() => {
     suppressAutoScroll = false;
-    seekTo(timeAtX(wrap.scrollLeft + 34 + 20));
+    seekTo(timeAtX(wrap.scrollLeft + wrap.clientWidth * PLAYHEAD_FRACTION));
   }, SCROLL_SEEK_DELAY_MS);
 });
 
@@ -2577,7 +2593,7 @@ document.getElementById('restart').addEventListener('click', () => {
 // niet meer met de nieuwe breedte.
 window.addEventListener('resize', () => {
   if (playing) {
-    scrollStaffFollow(xAtTime((performance.now() - startT) / beatMs - COUNT_IN), idx > 0);
+    scrollStaffFollowPlayhead(xAtTime((performance.now() - startT) / beatMs - COUNT_IN));
   } else if (notes.length) {
     const anchorIdx = Math.min(idx, notes.length - 1);
     scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
