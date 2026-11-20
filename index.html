@@ -426,8 +426,8 @@
     <div class="controlGroup">
       <span class="groupLabel">Niveau</span>
       <select id="difficulty">
-        <option value="beginner">Beginner</option>
-        <option value="medior" selected>Medior</option>
+        <option value="beginner" selected>Beginner</option>
+        <option value="medior">Medior</option>
         <option value="advanced">Advanced</option>
       </select>
     </div>
@@ -654,11 +654,11 @@ const MISS_GRACE_MS = 300;
 // perfectWindow: hoe dicht bij de tel voor de volle timingbonus.
 // octaveStrict: true betekent dat alleen de exacte octaaf telt, niet elke octaaf van dezelfde toon.
 const DIFFICULTIES = {
-  beginner: { label: 'Beginner', window: 0.75, perfectWindow: 0.35, octaveStrict: false },
+  beginner: { label: 'Beginner', window: 2,    perfectWindow: 0.35, octaveStrict: false },
   medior:   { label: 'Medior',   window: 0.5,  perfectWindow: 0.15, octaveStrict: false },
   advanced: { label: 'Advanced', window: 0.25, perfectWindow: 0.08, octaveStrict: true }
 };
-let difficulty = DIFFICULTIES.medior;
+let difficulty = DIFFICULTIES.beginner;
 
 // ---------- Notenhulpjes ----------
 const LETTERS = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
@@ -726,6 +726,7 @@ let song = SONGS[0];
 let notes = [];
 let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
+let noteResults = []; // per noot-index: 'hit' | 'missed' | undefined (nog niet aan de beurt geweest)
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
 let metronomeOn = false;
@@ -763,7 +764,7 @@ function loadSong(s) {
   beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
-  idx = 0; wrongs = 0; streak = 0;
+  idx = 0; wrongs = 0; streak = 0; noteResults = [];
   skipRests();
   document.getElementById('title').textContent = s.title;
   const warn = document.getElementById('draftWarn');
@@ -923,7 +924,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
         const done = i < activeIdx;
         const current = i === activeIdx;
         noteOpacity = (done || current) ? 1 : 0.45;
-        highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
+        highlight = done ? (noteResults[i] === 'missed' ? '#d9495f' : '#1f8f68') : current ? '#8c73e8' : 'none';
       } else {
         noteOpacity = 0.4;
       }
@@ -1075,6 +1076,7 @@ function onHeard(midi, tEvent) {
   streak++;
   let streakNote = '';
   if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
+  noteResults[idx] = 'hit';
   idx++;
   skipRests();
   const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
@@ -1311,7 +1313,7 @@ function setPlayButtonsState(isPlaying) {
 function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
-  idx = 0; wrongs = 0; streak = 0;
+  idx = 0; wrongs = 0; streak = 0; noteResults = [];
   skipRests();
   playing = true;
   beatMs = 60000 / song.bpm / tempoScale;
@@ -1403,6 +1405,7 @@ function tick(now) {
       const m = notes[idx];
       wrongs++;
       streak = 0;
+      noteResults[idx] = 'missed';
       idx++;
       missed = true;
       setFeedback(`Gemist: ${m.label} met R${m.finger}`, 'bad');
