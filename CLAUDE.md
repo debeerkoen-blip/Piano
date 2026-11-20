@@ -16,7 +16,7 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
   kruis (`F#4`) hebben.
-- Zoekkaart onder de notenbalk: opent een zoekopdracht op IMSLP (publiek domein) in een nieuw tabblad. Geen eigen API-aanroep: Openopus en IMSLP sturen geen CORS-header mee, dus een fetch vanuit de browser wordt altijd geblokkeerd. Getest met een headless browser; de linknavigatie werkt, geen noten of metadata worden automatisch overgenomen.
+- Zoekkaart onder de notenbalk: opent een Google-zoekopdracht (`site:imslp.org <term>`) in een nieuw tabblad, exact wat IMSLP's eigen zoekvak doet (nagekeken door hun zoekformulier in te vullen). Geen eigen API-aanroep: Openopus en IMSLP sturen geen CORS-header mee, dus een fetch vanuit de browser wordt altijd geblokkeerd. IMSLP heeft ook geen `Special:Search`-pagina, die eerdere aanname bleek fout. Getest met een headless browser; de linknavigatie werkt, geen noten of metadata worden automatisch overgenomen.
 - "Lied toevoegen": paneel onderaan waarmee je zelf een lied overtypt vanaf een foto of pdf van
   bladmuziek (als kijkhulp ernaast, naast het live voorbeeldbalkje, wordt zelf niet bewaard) en
   opslaat. Zelf toegevoegde liederen staan in `localStorage` (`pianoCustomSongs`), niet in de
