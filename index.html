@@ -157,6 +157,8 @@
   }
   select, input[type="text"] { background:var(--surface); border-color:var(--border); color:var(--ink); font-weight:400; }
   select { min-width:170px; }
+  .songRow { flex-wrap:nowrap; }
+  #song { flex:1 1 auto; min-width:0; }
   button { cursor:pointer; color:var(--ink); background:var(--lavender); font-weight:600; }
   button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .btn-ghost { background:var(--surface); border-color:var(--border); }
@@ -254,6 +256,7 @@
   @media (max-width: 599.98px) {
     .groupRow { flex-direction:column; align-items:stretch; }
     select, button:not(.icon-btn), .soundToggle, input[type="text"] { width:100%; }
+    input[type="range"] { width:100%; }
     .pill { align-self:stretch; justify-content:center; }
     .searchRow { flex-direction:row; }
     .searchRow input { width:auto; }
@@ -333,6 +336,12 @@
         </button>
         <span class="tooltip" id="tip-restart" role="tooltip">Opnieuw beginnen</span>
       </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="metronomeBtn" aria-describedby="tip-metronome" aria-label="Metronoom aan">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21h6l-1.5-16h-3z"/><path d="M12 7v10"/><circle cx="14.4" cy="12.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <span class="tooltip" id="tip-metronome" role="tooltip">Metronoom aan</span>
+      </span>
 
       <span class="toolbarSpacer" aria-hidden="true"></span>
 
@@ -347,12 +356,6 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
         <span class="tooltip" id="tip-search" role="tooltip">Zoek klassieke stukken</span>
-      </span>
-      <span class="icon-btn-wrap">
-        <button type="button" class="icon-btn btn-ghost" id="addToggle" aria-expanded="false" aria-controls="addSongPanel" aria-describedby="tip-add" aria-label="Lied toevoegen">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <span class="tooltip" id="tip-add" role="tooltip">Lied toevoegen</span>
       </span>
     </div>
 
@@ -393,7 +396,15 @@
 
     <div class="controlGroup">
       <span class="groupLabel">Lied</span>
-      <select id="song"></select>
+      <div class="groupRow songRow">
+        <select id="song"></select>
+        <span class="icon-btn-wrap">
+          <button type="button" class="icon-btn btn-ghost" id="addToggle" aria-expanded="false" aria-controls="addSongPanel" aria-describedby="tip-add" aria-label="Lied toevoegen">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <span class="tooltip" id="tip-add" role="tooltip">Lied toevoegen</span>
+        </span>
+      </div>
     </div>
 
     <div class="controlGroup">
@@ -424,6 +435,14 @@
     <div class="controlGroup">
       <span class="groupLabel">Afspelen</span>
       <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
+    </div>
+
+    <div class="controlGroup">
+      <span class="groupLabel">Tempo</span>
+      <div class="groupRow">
+        <input type="range" id="tempoSlider" min="50" max="150" step="5" value="100" aria-label="Afspeeltempo, percentage van het liedtempo">
+        <span class="pill" id="tempoValue">100%</span>
+      </div>
     </div>
 
     <div class="controlGroup">
@@ -676,6 +695,16 @@ function xAtTime(t) {
   return xOf(i) + frac * (nextX - xOf(i));
 }
 
+// Omgekeerde van xAtTime/noteX: de teltijd die bij een x-positie hoort. Gebruikt
+// om te bepalen waar de speler naartoe heeft gescrold tijdens Speel af.
+function timeAtX(x) {
+  if (song.left) return Math.max(0, (x - 110) / 34);
+  if (!notes.length) return 0;
+  const i = Math.round((x - 110) / 34);
+  const clamped = Math.max(0, Math.min(notes.length - 1, i));
+  return notes[clamped].start;
+}
+
 // ---------- Spelstatus ----------
 let song = SONGS[0];
 let notes = [];
@@ -683,8 +712,19 @@ let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoor
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let noteResults = []; // per noot-index: 'hit' | 'missed' | undefined (nog niet aan de beurt geweest)
 let playing = false, startT = 0, beatMs = 667, rafId = null;
+let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
+let metronomeOn = false;
+let currentPlayHasSound = false; // of de lopende "Speel af" met pianogeluid speelt, voor herplannen na scroll-verspringen
 let phRect = null, liveMarker = null, liveLabel = null;
 let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan mag het automatisch meescrollen
+// dat niet meteen weer overschrijven. lastProgrammaticScrollLeft onderscheidt onze eigen
+// auto-scroll van een scroll door de speler: zet scrollLeft zelf, dan is het die van ons.
+let lastProgrammaticScrollLeft = null;
+let suppressAutoScroll = false;
+let userScrollTimer = null;
+const SCROLL_SEEK_DELAY_MS = 300;
 
 // Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
 // cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
@@ -705,7 +745,7 @@ function loadSong(s) {
   stopPlay(false);
   resetNoteDetection();
   song = s;
-  beatMs = 60000 / s.bpm;
+  beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
   idx = 0; wrongs = 0; streak = 0; noteResults = [];
@@ -953,11 +993,13 @@ function render() {
 // met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
 // noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
 function scrollStaffFollow(x, hasPrevious) {
+  if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
   const wrap = document.querySelector('.staffWrap');
   if (!wrap) return;
   const target = hasPrevious ? x - 34 - 20 : 0;
   const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
   wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  lastProgrammaticScrollLeft = wrap.scrollLeft;
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
@@ -1070,6 +1112,20 @@ function getNoiseBuffer(ctx) {
   return buffer;
 }
 
+function scheduleMetronomeTick(when, accent) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = accent ? 1500 : 1000;
+  gain.gain.setValueAtTime(accent ? 0.18 : 0.11, when);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when + 0.05);
+  scheduledSources.push(osc);
+}
+
 function scheduleHammerNoise(when, freq) {
   const src = audioCtx.createBufferSource();
   src.buffer = getNoiseBuffer(audioCtx);
@@ -1159,6 +1215,28 @@ function scheduleNoteSound(midi, when, duration) {
   }
 }
 
+// Plant de metronoomtikken van het lied (niet het aftellen) vanaf fromBeat, zodat zowel
+// een gewone start (fromBeat 0) als verdergaan na een scroll-sprong (fromBeat = waar je
+// naartoe scrolde) dezelfde planning gebruiken.
+function scheduleMetronomeFromBeat(fromBeat, audioStart, beatSec) {
+  const beatsPerMeasure = song.beatsPerMeasure || 4;
+  const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
+  for (let b = Math.max(0, Math.ceil(fromBeat)); b < songBeats; b++) {
+    scheduleMetronomeTick(audioStart + (b - fromBeat) * beatSec, b % beatsPerMeasure === 0);
+  }
+}
+
+// Plant het pianogeluid van de noten vanaf fromBeat, zelfde reden als hierboven.
+function scheduleNotesFromBeat(fromBeat, audioStart, beatSec) {
+  const noteList = [...notes, ...contextNotes].filter(n => !n.rest && n.start >= fromBeat);
+  loadPianoSamples(audioCtx).finally(() => {
+    if (!playing) return; // intussen gestopt of opnieuw verplaatst, niet meer plannen
+    noteList.forEach(n => {
+      scheduleNoteSound(n.midi, audioStart + (n.start - fromBeat) * beatSec, n.dur * beatSec * 0.85);
+    });
+  });
+}
+
 function scheduleSynthesizedNote(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
@@ -1222,6 +1300,7 @@ function startPlay(forceSound = false) {
   idx = 0; wrongs = 0; streak = 0; noteResults = [];
   skipRests();
   playing = true;
+  beatMs = 60000 / song.bpm / tempoScale;
   startT = performance.now();
   setPlayButtonsState(true);
   document.getElementById('restart').disabled = true;
@@ -1229,26 +1308,56 @@ function startPlay(forceSound = false) {
   render();
   updateStats();
 
-  if ((forceSound || document.getElementById('soundToggle').checked) && audioCtx) {
+  currentPlayHasSound = forceSound || document.getElementById('soundToggle').checked;
+
+  if (audioCtx) {
     const beatSec = beatMs / 1000;
-    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
-    // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
-    // tussen de handen te horen.
-    const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
-    // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
-    // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
-    // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
-    // op null en gebruiken we de synthese.
-    loadPianoSamples(audioCtx).finally(() => {
-      if (!playing) return; // intussen gestopt, niet meer plannen
-      const audioStart = audioCtx.currentTime;
-      noteList.forEach(n => {
-        scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
-      });
-    });
+    const audioStart = audioCtx.currentTime;
+
+    if (metronomeOn) {
+      for (let c = 0; c < COUNT_IN; c++) {
+        scheduleMetronomeTick(audioStart + c * beatSec, c === 0);
+      }
+      scheduleMetronomeFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
+    }
+
+    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de rechterhand
+    // beoordeeld: dat klinkt muzikaler en helpt om de samenhang tussen de handen te horen.
+    if (currentPlayHasSound) {
+      scheduleNotesFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
+    }
   }
 
   rafId = requestAnimationFrame(tick);
+}
+
+// Verspring de speelpositie naar targetT (in tellen) zonder de score of de reeks te
+// resetten: bedoeld voor wanneer de speler tijdens Speel af zelf over de notenbalk
+// scrolt. Annuleert het reeds geplande geluid en plant het opnieuw vanaf de nieuwe plek.
+function seekTo(targetT) {
+  if (!playing || !notes.length) return;
+  targetT = Math.max(0, targetT);
+
+  scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledSources = [];
+
+  let newIdx = notes.findIndex(n => n.start + n.dur > targetT);
+  if (newIdx === -1) newIdx = Math.max(0, notes.length - 1);
+  idx = newIdx;
+  skipRests();
+
+  // Geen aftellen: startT zo zetten dat tick() meteen op targetT uitkomt.
+  startT = performance.now() - (targetT + COUNT_IN) * beatMs;
+  resetNoteDetection();
+  render();
+  updateStats();
+
+  if (audioCtx) {
+    const beatSec = beatMs / 1000;
+    const audioStart = audioCtx.currentTime;
+    if (metronomeOn) scheduleMetronomeFromBeat(targetT, audioStart, beatSec);
+    if (currentPlayHasSound) scheduleNotesFromBeat(targetT, audioStart, beatSec);
+  }
 }
 
 function tick(now) {
@@ -1304,6 +1413,8 @@ function stopPlay(completed) {
   scheduledSources = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
+  clearTimeout(userScrollTimer);
+  suppressAutoScroll = false;
   const was = playing;
   playing = false;
   setPlayButtonsState(false);
@@ -2024,12 +2135,39 @@ document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
 });
 
+document.getElementById('tempoSlider').addEventListener('input', (e) => {
+  tempoScale = Number(e.target.value) / 100;
+  document.getElementById('tempoValue').textContent = `${e.target.value}%`;
+});
+
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
   if (ok) setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
 });
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
+
+document.getElementById('metronomeBtn').addEventListener('click', (e) => {
+  metronomeOn = !metronomeOn;
+  const btn = e.currentTarget;
+  btn.classList.toggle('is-on', metronomeOn);
+  setIconLabel(btn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+});
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan pauzeert het automatisch
+// meescrollen (zie scrollStaffFollow) en springt de speelpositie, 300ms nadat je
+// stopt met scrollen, mee naar de plek waar je naartoe scrolde.
+document.querySelector('.staffWrap').addEventListener('scroll', () => {
+  const wrap = document.querySelector('.staffWrap');
+  if (wrap.scrollLeft === lastProgrammaticScrollLeft) return; // onze eigen auto-scroll
+  if (!playing) return;
+  suppressAutoScroll = true;
+  clearTimeout(userScrollTimer);
+  userScrollTimer = setTimeout(() => {
+    suppressAutoScroll = false;
+    seekTo(timeAtX(wrap.scrollLeft + 34 + 20));
+  }, SCROLL_SEEK_DELAY_MS);
+});
 
 document.getElementById('playBtn').addEventListener('click', async () => {
   if (playing) { stopPlay(false); return; }
