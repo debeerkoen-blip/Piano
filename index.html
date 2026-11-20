@@ -686,9 +686,10 @@ async function startMic() {
 }
 
 // Geluidsniveau van een meetbuffer (RMS, root mean square).
-// Was eerst 0.008, toen 0.0025: allebei nog te hoog voor een piano op normale
-// afstand. Een stem vlak bij de microfoon haalt dat makkelijk, een piano niet.
-const RMS_THRESHOLD = 0.001; // onder dit niveau geldt het als stilte
+// Geschiedenis: 0.008, toen 0.0025, toen 0.001, stuk voor stuk nog te hoog voor
+// een piano op normale afstand. Een stem vlak bij de microfoon haalt dat
+// makkelijk, een piano niet.
+const RMS_THRESHOLD = 0.0004; // onder dit niveau geldt het als stilte
 function computeRms(b) {
   let sum = 0;
   for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
@@ -817,18 +818,22 @@ function updateVolMeter(rms) {
 function updateLiveMarker(f1, f2, midi) {
   if (!liveMarker || !liveLabel) return;
 
-  let freq = null, confident = false;
-  if (midi !== null) { freq = f1; confident = true; }
-  else if (f1 || f2) { freq = f1 || f2; confident = false; }
+  let shownMidi = null, confident = false;
+  if (midi !== null) {
+    shownMidi = midi;
+    confident = true;
+  } else if (f1 || f2) {
+    shownMidi = Math.round(69 + 12 * Math.log2((f1 || f2) / 440) - calibrationOffset);
+    confident = false;
+  }
 
-  if (!freq) {
+  if (shownMidi === null) {
     liveMarker.setAttribute('opacity', 0);
     liveLabel.setAttribute('opacity', 0);
     return;
   }
 
-  const rawMidi = Math.round(69 + 12 * Math.log2(freq / 440) - calibrationOffset);
-  const noteLabel = midiToLabel(rawMidi);
+  const noteLabel = midiToLabel(shownMidi);
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
@@ -855,10 +860,19 @@ function listen() {
   const f2 = detectPitchYIN(buf, audioCtx.sampleRate);
 
   // Alleen vertrouwen als beide detectoren binnen 40 cent (minder dan een halve
-  // toonafstand) van elkaar zitten. Dat filtert octaaffouten en losse ruis eruit.
+  // toonafstand) van elkaar zitten. Dat filtert losse ruis eruit.
+  // Zitten ze precies een octaaf uit elkaar, dan vertrouwen we de laagste: op een
+  // akoestische piano is een boventoon die voor de grondtoon wordt aangezien een
+  // veel voorkomendere fout dan andersom.
   let midi = null;
-  if (f1 && f2 && Math.abs(centsBetween(f1, f2)) < 40) {
-    midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
+  if (f1 && f2) {
+    const cents = centsBetween(f1, f2);
+    if (Math.abs(cents) < 40) {
+      midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
+    } else if (Math.abs(Math.abs(cents) - 1200) < 50) {
+      const lower = Math.min(f1, f2);
+      midi = Math.round(69 + 12 * Math.log2(lower / 440) - calibrationOffset);
+    }
   }
   document.getElementById('heard').textContent = midi !== null ? `Gehoord: ${midiToLabel(midi)}` : 'Gehoord: -';
   updateLiveMarker(f1, f2, midi);
