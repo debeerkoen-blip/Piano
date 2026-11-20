@@ -228,7 +228,11 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   best-effort no-cache meta-tags in de `<head>`, maar browsers negeren die meestal voor de
   echte HTTP-cache.
 - Ode an de vreugde: noten en vingerzetting zijn uit het hoofd ingevuld, nog niet gecontroleerd.
-- Gymnopédie nr. 1: concept (`draft: true`). Controleer tegen de partituur op IMSLP (publiek domein) voordat je die gebruikt.
+- Gymnopédie nr. 1: nog `draft: true`, maar de noten en duren komen nu uit een machineleesbare
+  bron (Mutopia Project, zie de toelichting in `SONGS`), niet meer van een foto. Wat nog wel
+  eigen werk is: vingerzetting (zelf bedacht, niet gecontroleerd) en een paar vereenvoudigingen
+  waar de bron meer stemmen tegelijk heeft dan de app kan weergeven (zie de toelichting bij het
+  lied zelf voor precies welke maten).
 - Sinterklaas (Daar wordt aan de deur geklopt): concept (`draft: true`), overgetypt van een foto
   van de bladmuziek, inclusief linkerhand. Vingerzetting is alleen zeker op de plekken waar de
   partituur een cijfer gaf; daartussen is dat cijfer aangehouden. Het laatste akkoord van de
