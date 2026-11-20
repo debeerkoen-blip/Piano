@@ -71,15 +71,17 @@
 
 <script>
 // ---------- Liederen (losse data, makkelijk aan te vullen) ----------
-// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf.
-// fingers: rechterhandvinger per noot (1 = duim, 5 = pink).
-// bpm: tempo voor "Speel af". Elke noot duurt hier één tel.
-// draft: true betekent dat de noten en vingerzetting nog niet zijn gecontroleerd.
+// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf. Gebruik null voor een rust.
+// fingers: rechterhandvinger per noot (1 = duim, 5 = pink). null op een rust-plek.
+// bpm: tempo voor "Speel af". Elke noot of rust duurt hier één tel.
+// beatsPerMeasure: aantal tellen per maat, voor de maatstrepen in de notenbalk.
+// draft: true betekent dat de noten, vingerzetting en maatindeling nog niet zijn gecontroleerd.
 const SONGS = [
   {
     id: 'ode',
     title: 'Ode an de vreugde (Beethoven)',
     bpm: 90,
+    beatsPerMeasure: 4,
     draft: false,
     notes:   ['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'],
     fingers: [ 3,   3,   4,   5,   5,   4,   3,   2,   1,   1,   2,   3,   3,   2,   2 ]
@@ -88,6 +90,8 @@ const SONGS = [
     id: 'gymno',
     title: 'Gymnopédie nr. 1 (Satie), eerste frase',
     bpm: 60,
+    // Maatsoort nog niet tegen de partituur gecontroleerd, zie draft-waarschuwing.
+    beatsPerMeasure: 4,
     draft: true,
     notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
     fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
@@ -140,16 +144,24 @@ function loadSong(s) {
   resetNoteDetection();
   song = s;
   beatMs = 60000 / s.bpm;
-  notes = s.notes.map((n, i) => ({ ...parseNote(n), finger: s.fingers[i], start: i }));
+  notes = s.notes.map((n, i) => n === null
+    ? { rest: true, start: i, label: 'rust', finger: null }
+    : { ...parseNote(n), rest: false, finger: s.fingers[i], start: i });
   idx = 0; wrongs = 0; streak = 0;
+  skipRests();
   document.getElementById('title').textContent = s.title;
   const warn = document.getElementById('draftWarn');
   warn.hidden = !s.draft;
-  warn.textContent = 'Let op: deze noten en vingerzetting zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
+  warn.textContent = 'Let op: deze noten, vingerzetting en maatindeling zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
   document.getElementById('restart').disabled = true;
   setFeedback('Speel de eerste noot, of druk op Speel af.', '');
   render();
   updateStats();
+}
+
+// Een rust vraagt geen input: sla 'm meteen over zodra idx hem bereikt.
+function skipRests() {
+  while (idx < notes.length && notes[idx].rest) idx++;
 }
 
 function setFeedback(text, cls) {
@@ -175,21 +187,40 @@ function render() {
   // Speelstreep eerst tekenen, zodat de noten erboven liggen.
   phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#dc2626', opacity:0 });
 
+  // Maatstrepen: één per volle maat, plus een slotstreep aan het eind.
+  const beatsPerMeasure = song.beatsPerMeasure || 4;
+  for (let i = beatsPerMeasure; i < notes.length; i += beatsPerMeasure) {
+    const x = xOf(i) - 17;
+    el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 });
+  }
+  if (notes.length) {
+    const xEnd = xOf(notes.length - 1) + 17;
+    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 });
+  }
+
   notes.forEach((n, i) => {
     const x = xOf(i);
+    const done = i < idx;
+    const opacity = done ? 1 : 0.45;
+
+    if (n.rest) {
+      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#333', opacity });
+      rest.textContent = '\u{1D13D}'; // kwart rust
+      return;
+    }
+
     const y = yOf(n.step);
     const isC = n.letter === 'C';
     const fill = isC ? '#e8832a' : '#333';
-    const done = i < idx;
     const current = i === idx;
-    const opacity = (done || current) ? 1 : 0.45;
+    const noteOpacity = (done || current) ? 1 : 0.45;
     const stroke = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
 
     if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#333', 'stroke-width':1.5 });
-    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity, stroke, 'stroke-width':2.5 });
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity, 'stroke-width':1.6 });
+    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity: noteOpacity, stroke, 'stroke-width':2.5 });
+    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 });
 
-    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity });
+    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity });
     finger.textContent = 'R' + n.finger;
   });
 
@@ -215,6 +246,7 @@ function onHeard(midi, tEvent) {
       streak++;
       if (streak >= 5) xp += 5;
       idx++;
+      skipRests();
       setFeedback(`Goed! +${bonus} XP${diff === 0 ? '' : ' (andere octaaf telt ook)'}`, 'ok');
       if (idx === notes.length) finish();
       else render();
@@ -250,6 +282,7 @@ function onHeard(midi, tEvent) {
   streak++;
   if (streak >= 5) xp += 5;
   idx++;
+  skipRests();
   const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
   setFeedback(`${timing}! +${bonus} XP`, 'ok');
 
@@ -300,6 +333,7 @@ function startPlay() {
   stopPlay(false);
   resetNoteDetection();
   idx = 0; wrongs = 0; streak = 0;
+  skipRests();
   playing = true;
   startT = performance.now();
   document.getElementById('playBtn').textContent = 'Stop';
@@ -312,6 +346,7 @@ function startPlay() {
     const beatSec = beatMs / 1000;
     const audioStart = audioCtx.currentTime;
     notes.forEach(n => {
+      if (n.rest) return;
       scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, beatSec * 0.8);
     });
   }
@@ -328,9 +363,14 @@ function tick(now) {
     setFeedback(`Tel mee... ${countdown}`, '');
     phRect.setAttribute('opacity', 0);
   } else {
-    // Noten die voorbij het venster zijn, tellen als gemist.
+    // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
+    // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
     let missed = false;
-    while (idx < notes.length && t > notes[idx].start + WINDOW) {
+    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + WINDOW)) {
+      if (notes[idx].rest) {
+        idx++;
+        continue;
+      }
       const m = notes[idx];
       wrongs++;
       streak = 0;
