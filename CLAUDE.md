@@ -47,6 +47,27 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   (viewBox-breedte/hoogte schalen mee, dus geen scheve aspect ratio). `STAFF_X0`/`NOTE_SPACING`
   zijn de geschaalde basismaten die ook buiten `drawGrandStaff` gebruikt worden (`xOf`, `noteX`,
   `xAtTime`, `timeAtX`, `scrollStaffFollow`); die rekenen niet meer met de losse getallen 110/34.
+- De hele kaart (titel, statistieken, werkbalk, notenbalk, toetsenbord, feedbacktekst) past op
+  één scherm, zonder dat je tijdens het spelen hoeft te scrollen (alleen de bronvermelding
+  onderaan de pagina mag daarbuiten vallen, dat is geen interactief onderdeel). Twee plekken
+  hadden daar apart werk voor nodig, in allebei de gevallen door de notenbalk zelf een kleinere,
+  schermhoogte-afhankelijke hoogte te geven (`width:auto; min-width:0`, met horizontaal scrollen
+  voor lange liederen zoals al gebeurde op een smalle telefoon) in plaats van op volle breedte
+  te schalen:
+  - Liggende telefoon (`@media (orientation:landscape) and (max-height:500px)`): naast de
+    notenbalk zelf (`height:min(44vh,230px)`) zijn ook titel, statistieken en feedbacktekst
+    compacter gemaakt (kleinere `min-height`/`padding`/`line-height`, minder marge ertussen):
+    die hadden allemaal een eigen minimale knop-/touch-target-hoogte (44px) die in deze context
+    meer ruimte opeist dan de inhoud zelf nodig heeft.
+  - Rechtop (portretstand) met een lied met linkerhand (grote notenbalk, twee regels, van
+    zichzelf hoger): `render()` zet een klasse `hasLeft` op `.staffWrap` zodra er een linkerhand
+    is (`contextNotes.length > 0`), en alleen in portretstand (niet in de liggende/brede
+    varianten hierboven, die hebben al hun eigen hoogte) krijgt de notenbalk dan
+    `height:clamp(140px, calc(100vh - 400px), 420px)`: `calc(100vh - 400px)` is de ruimte die
+    overblijft nadat de rest van de kaart (gemeten, vrij stabiel ongeacht schermbreedte) zijn deel
+    al heeft gehad, `clamp()` voorkomt dat dat op een heel klein of heel groot scherm absurd
+    uitpakt. Een lied zonder linkerhand (de normale, enige hand die je oefent) is van zichzelf al
+    laag genoeg en blijft gewoon op volle breedte schalen, ongewijzigd.
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
@@ -93,10 +114,18 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   Beginner heeft een ruim tijdvenster (2 tellen), zodat de juiste toon al telt ook al ben je
   lang niet precies op de tel; dat kost alleen de timingbonus, niet de toonpunten. Beginner is
   het standaardniveau.
-- Gemiste noten (door tick()'s "gemist"-sweep, niet door een verkeerd gespeelde toon) krijgen
-  een rode rand op de notenbalk in plaats van groen, zodat je in één oogopslag ziet welke noten
-  je niet op tijd te pakken kreeg. Bijgehouden in `noteResults` (per noot-index 'hit' of
-  'missed'), gereset bij elk nieuw lied en bij elke nieuwe poging.
+- Gemiste noten (door tick()'s "gemist"-sweep, niet door een verkeerd gespeelde toon) kleuren
+  helemaal rood op de notenbalk (notenkop én rand, niet alleen een rand om een verder normale
+  notenkop: dat was te subtiel om in één oogopslag te zien), een goed gespeelde noot helemaal
+  groen. Bijgehouden in `noteResults` (per noot-index 'hit' of 'missed'), gereset bij elk nieuw
+  lied en bij elke nieuwe poging. Geldt alleen voor de rechterhand: de linkerhand (ter context,
+  niet beoordeeld omdat de pitch-detectie maar één toon tegelijk herkent) blijft altijd gewoon
+  zwart, ook als die toon tegelijk "voorbij" is volgens de speelstreep, want er is geen oordeel
+  om te tonen. De paarse "dit moet je nu spelen"-markering is geen oordeel en blijft daarom wel
+  gewoon een rand om een normale notenkop, niet de hele noot. Geen aparte "Gemist: ..."-tekst
+  in de feedback meer bij een gemiste noot (de rode notenkop en de stand van de speelstreep
+  laten al zien wat er gemist is); bij een op tijd gespeelde noot staat er nog gewoon een
+  positieve feedbacktekst.
 - Een juist geraakte noot krijgt een korte "flits"-animatie (`animateNoteHit()`): de noot veert
   even op en er dijt een ring omheen uit die wegvaagt, zoals in ritmespellen als Guitar Hero.
   Gemiste of nog niet gespeelde noten blijven gewoon staan, geen animatie. Werkt los van
@@ -126,6 +155,10 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   scherm niet stabiel was. `main` krijgt dan evenveel extra `padding-bottom` gereserveerd (108px,
   of 76px in de extra compacte telefoon-liggend-variant) zodat deze vaste balk niet over de
   feedbacktekst heen schuift.
+  `renderKeyboard()` kleurt de huidige toets op dezelfde pointer als de notenbalk gebruikt
+  (`playing ? passedIdx : idx`, zie hierboven), niet zomaar op `idx` zelf: tijdens Speel af liep
+  de paarse toets anders niet synchroon met de paarse markering op de notenbalk, omdat `idx` dan
+  bewust wat coulance heeft (venster/`MISS_GRACE_MS`) en `passedIdx` niet.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
