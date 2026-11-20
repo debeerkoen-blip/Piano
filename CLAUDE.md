@@ -14,6 +14,28 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   misbruik). Er stond hier ook een losse tekstmelding ("Speel: E4 met R3" / "Zet eerst de
   microfoon aan..."), die is weg: het pianotoetsenbord (zie verderop) laat de te spelen toets
   al zien, een tweede tekstuele versie van diezelfde info was overbodig.
+- "Speel af" met geluid + microfoon tegelijk aan, in de verwachting dat de telefoon zichzelf
+  hoort en de noten dus groen worden: werkt op een echte telefoon meestal niet, en dat is
+  vermoedelijk geen bug in de herkenning zelf. Getest (digitaal, buiten de speaker/microfoon
+  om, door het geschakelde geluid rechtstreeks af te tappen naar een analyser) dat
+  `detectPitch`/`detectPitchYIN` de juiste toon gewoon herkennen voor het hele notenbereik dat
+  de liedjes gebruiken, zelfs met een ruwe simulatie van een telefoonluidspreker (laagfrequenties
+  weggefilterd, flink wat geluidsverlies): dat wijst níet op een drempel- of algoritmeprobleem.
+  Waarschijnlijker: `getUserMedia` vraagt al `echoCancellation:false`, maar mobiele browsers
+  (vooral iOS Safari) negeren dat vaak, juist omdat akoestische echo-onderdrukking specifiek
+  bedoeld is om het eigen afgespeelde geluid uit de microfoon-opname te filteren (zoals bij
+  een videobelgesprek, zodat je jezelf niet via de ander terughoort) — dat gebeurt dan op
+  OS-niveau, niet iets wat vanuit de pagina is uit te zetten. Dat verklaart ook meteen waarom
+  dit juist mét oordopjes (akoestisch dan helemaal gescheiden) nooit zou werken, en waarom
+  een ANDER apparaat (niet dit toestel) het geluid laten afspelen dicht bij de microfoon, wel
+  zou moeten werken: dat is geen "eigen-geluid", dus geen reden voor de telefoon om het weg te
+  filteren. Twee automatische detectoren het eens laten zijn blijft verder ook gewoon bedoeld
+  voor een echte akoestische piano (of stem) in de kamer, niet voor het eigen afspeel-geluid van
+  het toestel zelf.
+  Zijdelings gevonden tijdens dit onderzoek (geen van beide relevant voor de hierboven
+  gebruikte noten): de herkenning heeft een vast bereik van ongeveer 80Hz tot 1000Hz
+  (`maxLag = sr/80`, `minLag = sr/1000` in beide detectoren), dus zowel een erg lage noot
+  (onder C3) als een erg hoge (boven B5) valt daarbuiten.
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
