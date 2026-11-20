@@ -8,6 +8,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+- Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
+  bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
+  en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
+  herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
+  los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
+  noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
 - Speel af: een balk loopt over de noten met aftellen (4 tellen).
 - Geluid bij "Speel af": echte pianosamples (Salamander Grand Piano, CC BY 3.0, opnames van
   Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke
@@ -15,7 +21,14 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   stopt na haar eigen tel-duur met een korte fade (demper), niet pas als de hele opname is
   uitgeklonken. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
   de oudere synthetische pianoklank (oscillators met boventonen, inharmoniciteit en een
-  hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina.
+  hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina. Naast
+  "Speel af" staat een los icoontje dat altijd met pianogeluid afspeelt, ook als "Met geluid"
+  in de instellingen uit staat.
+- De notenbalk scrollt automatisch mee met de voortgang: tijdens "Speel af" volgt hij de
+  speelstreep, in oefenmodus elke nieuwe noot. De huidige noot komt links in beeld met nog 1
+  oude noot ervoor als context.
+- De live-indicator blijft minstens een halve seconde zichtbaar na het laatste signaal, in
+  plaats van meteen te verdwijnen zodra de toon wegvalt.
 - Oefenmodus: alleen toonhoogte, zonder tijd.
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.

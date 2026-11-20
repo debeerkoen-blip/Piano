@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Piano prototype</title>
 <style>
   :root {
@@ -25,19 +25,33 @@
     --radius-s:8px; --radius-m:14px; --radius-l:20px; --radius-pill:999px;
   }
   * { box-sizing: border-box; }
-  html, body { width:100%; }
+  /* overflow-x:hidden als vangnet: voorkomt dat decoratieve elementen die net
+     iets buiten hun knop uitsteken (bijvoorbeeld een brede tooltip, gecentreerd
+     op een kleine knop) de hele pagina zijwaarts scrollbaar maken. Alles wat
+     binnen de viewport past blijft gewoon zichtbaar, dit raakt alleen de
+     scrollbaarheid van de pagina zelf. */
+  html, body { width:100%; overflow-x:hidden; }
   body {
     margin:0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%);
     background-attachment: fixed;
     color:var(--ink);
   }
-  main { width:100%; max-width: var(--vp-wide); margin-inline:auto; padding: var(--space-6) var(--space-4) var(--space-12); }
-  h1 { font-size:22px; margin:0 0 var(--space-1); line-height:1.25; }
-  .sub { color:var(--muted); margin:0 0 var(--space-6); font-size:14px; max-width:65ch; }
+  main {
+    width:100%; max-width: var(--vp-wide); margin-inline:auto;
+    padding-top: max(var(--space-6), env(safe-area-inset-top));
+    padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
+    padding-left: max(var(--space-4), env(safe-area-inset-left));
+    padding-right: max(var(--space-4), env(safe-area-inset-right));
+  }
+  .sub { color:var(--muted); margin:0; font-size:14px; max-width:65ch; }
 
-  /* ---------- Statistieken ---------- */
-  .stats { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); flex-wrap:wrap; }
+  /* ---------- Titel ---------- */
+  .topBar { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-4); }
+  h1 { font-size:22px; font-weight:600; margin:0; line-height:1.25; }
+
+  /* ---------- Statistieken (scores) ---------- */
+  .stats { display:flex; gap:var(--space-3); margin-bottom:var(--space-6); flex-wrap:wrap; }
   .stat {
     flex:1 1 100px; min-width:90px; text-align:center;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
@@ -47,11 +61,38 @@
   .stat-streak { background: linear-gradient(180deg, var(--peach) 0%, var(--surface) 75%); }
   .stat-stars { background: linear-gradient(180deg, var(--gold) 0%, var(--surface) 75%); }
   .statIcon { display:block; font-size:18px; margin-bottom:var(--space-1); }
-  .stat b { display:block; font-size:22px; line-height:1.1; }
+  .stat b { display:block; font-size:22px; font-weight:600; line-height:1.1; }
   .statLabel { font-size:12px; color:var(--muted); }
+
+  /* ---------- Icoonknoppen ---------- */
+  .icon-btn-wrap { position:relative; display:inline-flex; }
+  .icon-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:44px; height:44px; padding:0; border-radius:var(--radius-m);
+    background:var(--lavender); color:var(--ink); border:1px solid transparent; cursor:pointer;
+  }
+  .icon-btn.btn-ghost { background:var(--surface); border-color:var(--border); }
+  .icon-btn.is-on { background:var(--mint); }
+  .icon-btn:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
+  .icon-btn[aria-expanded="true"] { background:var(--accent-ring); color:#fff; }
+  .icon-btn.warnBtn { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.2); }
+  /* Zonder deze regel wint "display:inline-flex" hierboven van de browser-eigen
+     "[hidden] { display:none }" bij gelijke specificiteit, en blijft een
+     verborgen icoonknop (zoals draftBadge) gewoon zichtbaar. */
+  .icon-btn[hidden] { display:none; }
+
+  .tooltip {
+    position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; font-size:12px; font-weight:500; line-height:1.3;
+    padding:4px 8px; border-radius:6px; white-space:nowrap; pointer-events:none;
+    opacity:0; transition:opacity .12s ease; z-index:20;
+  }
+  .icon-btn:hover + .tooltip, .icon-btn:focus-visible + .tooltip { opacity:1; }
 
   /* ---------- Notenbalk-kaart ---------- */
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
+  .staffToolbar { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-4); }
+  .toolbarSpacer { flex:1 1 auto; min-width:var(--space-4); }
   .staffWrap {
     overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
     scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
@@ -59,7 +100,11 @@
   .staffWrap::-webkit-scrollbar { height:8px; }
   .staffWrap::-webkit-scrollbar-track { background:transparent; }
   .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
-  svg { display:block; width:100%; min-width:600px; height:auto; }
+  /* Alleen de echte notenbalken scrollen/schalen zo breed; icoon-svg's in
+     knoppen moeten gewoon hun eigen kleine formaat houden. Klasse in plaats
+     van id, want een opgeslagen-liedjeslijst kan meerdere voorbeeldbalkjes
+     tonen. */
+  #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
   .scrollHint { font-size:12px; color:var(--muted); margin:var(--space-1) 0 0; text-align:center; }
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
@@ -72,8 +117,8 @@
   .legend { font-size:13px; color:var(--muted); margin-top:var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-1) var(--space-4); align-items:center; }
   .legend[hidden] { display:none; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
-  /* ---------- Besturing, gegroepeerd per functie ---------- */
-  .controlGroups { display:flex; flex-wrap:wrap; gap:var(--space-6); margin-top:var(--space-6); }
+
+  /* ---------- Besturing binnen de panelen, gegroepeerd per functie ---------- */
   .controlGroup { display:flex; flex-direction:column; gap:var(--space-2); }
   .groupLabel { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
   .groupRow { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; }
@@ -86,9 +131,7 @@
   select { min-width:170px; }
   button { cursor:pointer; color:var(--ink); background:var(--lavender); font-weight:600; }
   button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
-  #playBtn { background:var(--mint); }
   .btn-ghost { background:var(--surface); border-color:var(--border); }
-  .btn-icon { background:var(--peach); font-size:18px; padding:0 var(--space-3); }
 
   .pill {
     display:inline-flex; align-items:center; align-self:flex-start; min-height:36px;
@@ -116,19 +159,37 @@
   .soundToggle:has(input:checked) { background:var(--peach); border-color:transparent; }
   .soundToggle input { width:18px; height:18px; accent-color:var(--accent-ring); }
 
-  .warn { font-size:13px; color:#7a5300; background:#fff3d6; border:1px solid rgba(122,83,0,.15); border-radius:var(--radius-m); padding:var(--space-3) var(--space-4); margin-top:var(--space-6); }
+  .warn { font-size:13px; color:#7a5300; background:#fff3d6; border:1px solid rgba(122,83,0,.15); border-radius:var(--radius-m); padding:var(--space-3) var(--space-4); }
 
-  /* ---------- Zoekkaart klassieke stukken ---------- */
-  .searchCard { margin-top:var(--space-6); }
-  .searchCard h2 { margin:0 0 var(--space-1); font-size:17px; }
+  /* ---------- Panelen: Instellingen, Zoeken, Lied toevoegen ---------- */
+  .panelBackdrop { position:fixed; inset:0; background:rgba(43,38,64,.25); z-index:30; }
+  .panel {
+    position:fixed; top:0; right:0; height:100%; width:min(440px, 100vw);
+    background:var(--surface); border-left:1px solid var(--border);
+    box-shadow:-4px 0 16px rgba(43,38,64,.1);
+    z-index:31; display:flex; flex-direction:column; overflow-y:auto;
+  }
+  .panel[hidden] { display:none; }
+  .panelHead {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--space-4), env(safe-area-inset-right)) var(--space-4) var(--space-4);
+    border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:var(--surface);
+  }
+  .panelHead h2 { font-size:16px; margin:0; font-weight:600; }
+  .panelBody {
+    display:flex; flex-direction:column; gap:var(--space-6);
+    padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) max(var(--space-4), env(safe-area-inset-bottom)) var(--space-4);
+  }
+
+  /* ---------- Zoekpaneel ---------- */
   .searchRow input { flex:1 1 200px; min-width:0; }
 
   /* ---------- Lied toevoegen vanaf foto/pdf ---------- */
-  .addCard { margin-top:var(--space-6); }
-  .addCard .groupLabel { display:block; margin-top:var(--space-4); margin-bottom:var(--space-1); }
+  #addPanel { display:flex; flex-direction:column; gap:var(--space-6); }
   /* Foto/pdf en het voorbeeldbalkje naast elkaar, zodat ze makkelijk te vergelijken
      zijn; op smalle schermen staan ze gewoon onder elkaar. */
-  .addLayout { display:grid; grid-template-columns: 1fr; gap: var(--space-4); margin-top: var(--space-4); align-items:start; }
+  .addLayout { display:grid; grid-template-columns: 1fr; gap: var(--space-4); align-items:start; }
   @media (min-width: 760px) {
     .addLayout { grid-template-columns: 1fr 1fr; }
   }
@@ -139,14 +200,14 @@
   .refPreview { margin-top:var(--space-3); }
   .refPreview img { max-width:100%; max-height:420px; border-radius:var(--radius-m); border:1px solid var(--border); display:block; }
   .refPreview embed { width:100%; height:420px; border-radius:var(--radius-m); border:1px solid var(--border); }
-  .formRow { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-top:var(--space-4); }
+  .formRow { display:flex; gap:var(--space-4); flex-wrap:wrap; }
   .formRow label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:var(--space-1); }
   .formRow input {
     font: inherit; font-size:15px; padding:0 var(--space-3); min-height:40px;
     border-radius:var(--radius-s); border:1px solid var(--border); width:160px;
     background:var(--surface); color:var(--ink);
   }
-  .noteRows { margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2); }
+  .noteRows { display:flex; flex-direction:column; gap:var(--space-2); }
   .noteRow {
     display:flex; gap:var(--space-2); align-items:center; background:#f4f1fb;
     border-radius:var(--radius-s); padding:var(--space-2) var(--space-3); flex-wrap:wrap;
@@ -155,31 +216,57 @@
   .noteRow .rowNum { font-size:12px; color:var(--muted); width:20px; }
   .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:var(--space-1); }
   .noteRow .removeRow { margin-left:auto; min-height:30px; padding:0 var(--space-3); background:#ffe0e6; color:var(--bad-text); font-size:13px; }
-  .rowButtons { margin-top:var(--space-3); display:flex; gap:var(--space-2); flex-wrap:wrap; }
-  .previewStaff { margin-top:var(--space-4); background:#fbfaf7; border-radius:var(--radius-m); border:1px solid var(--border); }
-  .customList { margin-top:var(--space-6); }
+  .rowButtons { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+  .previewStaff { background:#fbfaf7; border-radius:var(--radius-m); border:1px solid var(--border); }
   .customSong { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--border); font-size:14px; }
   .deleteBtn { background:#ffe0e6; color:var(--bad-text); }
 
   :focus-visible { outline:2px solid var(--accent-ring); outline-offset:2px; }
 
   @media (max-width: 599.98px) {
-    .controlGroups { flex-direction:column; }
-    .controlGroup, .groupRow { width:100%; }
     .groupRow { flex-direction:column; align-items:stretch; }
-    select, button, .soundToggle, input[type="text"] { width:100%; }
+    select, button:not(.icon-btn), .soundToggle, input[type="text"] { width:100%; }
     .pill { align-self:stretch; justify-content:center; }
     .searchRow { flex-direction:row; }
     .searchRow input { width:auto; }
     .searchRow button { width:auto; flex:0 0 auto; }
     .formRow input { width:100%; }
   }
+
+  /* ---------- Telefoon horizontaal: weinig hoogte, ruim voldoende breedte ----------
+     Op een brede maar lage viewport (telefoon in landschapsstand) zou de notenbalk,
+     die normaal op breedte schaalt, veel te hoog worden. Laat 'm hier op hoogte
+     schalen (met horizontaal scrollen voor lange liederen, zoals al het geval is op
+     een smalle telefoon) en maak de rest van de chrome compacter, zodat alles past
+     zonder dat je tijdens het spelen moet scrollen. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    main { padding-top: var(--space-2); padding-bottom: var(--space-4); }
+    .topBar { margin-bottom: var(--space-2); }
+    h1 { font-size: 17px; }
+    .stats { margin-bottom: var(--space-2); gap: var(--space-2); }
+    .stat { padding: var(--space-1) var(--space-3); }
+    .statIcon { display: none; }
+    .stat b { font-size: 18px; }
+    .card { padding: var(--space-2) var(--space-3); }
+    .staffToolbar { margin-bottom: var(--space-2); }
+    .scrollHint { display: none; }
+    #staff { width: auto; min-width: 0; height: min(42vh, 220px); }
+    .progress { margin-top: var(--space-2); height: 6px; }
+    .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1 id="title">Speel het volgende</h1>
-  <p class="sub">Oefen zonder tijd, of speel af mee met de balk. De microfoon luistert naar je piano.</p>
+  <div class="topBar">
+    <h1 id="title">Speel het volgende</h1>
+    <span class="icon-btn-wrap">
+      <button type="button" class="icon-btn warnBtn" id="draftBadge" hidden aria-describedby="tip-draft" aria-label="Concept: nog niet gecontroleerd tegen de partituur">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.6 18a1.8 1.8 0 0 0 1.6 2.7h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 16.5h.01"/></svg>
+      </button>
+      <span class="tooltip" id="tip-draft" role="tooltip">Concept: nog niet gecontroleerd</span>
+    </span>
+  </div>
 
   <div class="stats">
     <div class="stat stat-xp"><span class="statIcon" aria-hidden="true">⚡</span><b id="xp">0</b><span class="statLabel">XP</span></div>
@@ -188,88 +275,158 @@
   </div>
 
   <div class="card">
+    <div class="staffToolbar" role="toolbar" aria-label="Oefenen">
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn" id="micBtn" aria-describedby="tip-mic" aria-label="Microfoon aan">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/><path d="M9 21h6"/></svg>
+        </button>
+        <span class="tooltip" id="tip-mic" role="tooltip">Microfoon aan</span>
+      </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn" id="playBtn" aria-describedby="tip-play" aria-label="Speel af">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <span class="tooltip" id="tip-play" role="tooltip">Speel af</span>
+      </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn" id="playSoundBtn" aria-describedby="tip-play-sound" aria-label="Speel af met pianogeluid">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 4.5v15l8-7.5z"/><circle cx="18.5" cy="18" r="2.3"/><rect x="19.6" y="4" width="1.6" height="14.5" rx="0.8"/><path d="M19.6 4l3 1v2.4l-3-1z"/></svg>
+        </button>
+        <span class="tooltip" id="tip-play-sound" role="tooltip">Speel af met pianogeluid</span>
+      </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="restart" disabled aria-describedby="tip-restart" aria-label="Opnieuw beginnen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>
+        </button>
+        <span class="tooltip" id="tip-restart" role="tooltip">Opnieuw beginnen</span>
+      </span>
+
+      <span class="toolbarSpacer" aria-hidden="true"></span>
+
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="settingsToggle" aria-expanded="false" aria-controls="settingsPanel" aria-describedby="tip-settings" aria-label="Instellingen: lied, niveau en microfoon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="tooltip" id="tip-settings" role="tooltip">Instellingen</span>
+      </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="searchToggle" aria-expanded="false" aria-controls="searchPanel" aria-describedby="tip-search" aria-label="Zoek klassieke stukken">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <span class="tooltip" id="tip-search" role="tooltip">Zoek klassieke stukken</span>
+      </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="addToggle" aria-expanded="false" aria-controls="addSongPanel" aria-describedby="tip-add" aria-label="Lied toevoegen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <span class="tooltip" id="tip-add" role="tooltip">Lied toevoegen</span>
+      </span>
+    </div>
+
     <div class="staffWrap">
       <svg id="staff" viewBox="0 0 600 240"></svg>
     </div>
     <p class="scrollHint" id="scrollHint" hidden>↔ Sleep opzij om het hele stuk te zien</p>
     <div class="progress"><div id="bar"></div></div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
-    <div class="legend">
-      <i style="background:#ec8f4c"></i>C-noten &nbsp;
-      <i style="background:#2b2640"></i>overige noten &nbsp;
-      R1 t/m R5 = rechter hand, vinger 1 t/m 5
-    </div>
-    <div class="legend">
-      <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
-      <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
-    </div>
-    <div class="legend" id="handLegend" hidden>
-      De onderste notenbalk (links, L1 t/m L5) is de linkerhand: die staat er alleen bij
-      als voorbeeld en wordt nog niet door de microfoon beoordeeld.
+  </div>
+
+  <p class="footNote">Pianoklank: opnames van de <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> door Alexander Holm (CC BY 3.0), via <a href="https://tonejs.github.io" target="_blank" rel="noopener">Tone.js</a>.</p>
+</main>
+
+<div class="panelBackdrop" id="panelBackdrop" hidden></div>
+
+<aside class="panel" id="settingsPanel" hidden aria-label="Instellingen">
+  <div class="panelHead">
+    <h2>Instellingen</h2>
+    <button type="button" class="icon-btn btn-ghost" id="settingsClose" aria-label="Instellingen sluiten">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="panelBody">
+    <div class="warn" id="draftWarn" hidden></div>
+
+    <div class="controlGroup">
+      <span class="groupLabel">Lied</span>
+      <select id="song"></select>
     </div>
 
-    <div class="controlGroups">
-      <div class="controlGroup">
-        <span class="groupLabel">Lied</span>
-        <select id="song"></select>
+    <div class="controlGroup">
+      <span class="groupLabel">Niveau</span>
+      <select id="difficulty">
+        <option value="beginner">Beginner</option>
+        <option value="medior" selected>Medior</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
+
+    <div class="controlGroup">
+      <span class="groupLabel">Microfoon</span>
+      <div class="groupRow">
+        <button type="button" id="calibBtn" class="btn-ghost">Stem af op C</button>
+        <span class="pill" id="heard">Gehoord: -</span>
+        <span class="pill" id="calibInfo"></span>
       </div>
-
-      <div class="controlGroup">
-        <span class="groupLabel">Niveau</span>
-        <select id="difficulty">
-          <option value="beginner">Beginner</option>
-          <option value="medior" selected>Medior</option>
-          <option value="advanced">Advanced</option>
-        </select>
-      </div>
-
-      <div class="controlGroup">
-        <span class="groupLabel">Microfoon</span>
-        <div class="groupRow">
-          <button id="micBtn">Microfoon aan</button>
-          <button id="calibBtn">Stem af op C</button>
-        </div>
-        <div class="groupRow">
-          <span class="pill" id="heard">Gehoord: -</span>
-          <span class="pill" id="calibInfo"></span>
-        </div>
-        <div class="groupRow">
-          <span class="volLabel">Volume</span>
-          <div class="volMeter" id="volMeter">
-            <div class="volMeterFill" id="volMeterFill"></div>
-            <div class="volMeterThreshold"></div>
-          </div>
+      <div class="groupRow">
+        <span class="volLabel">Volume</span>
+        <div class="volMeter" id="volMeter">
+          <div class="volMeterFill" id="volMeterFill"></div>
+          <div class="volMeterThreshold"></div>
         </div>
       </div>
+    </div>
 
-      <div class="controlGroup">
-        <span class="groupLabel">Afspelen</span>
-        <div class="groupRow">
-          <button id="playBtn">Speel af</button>
-          <button id="playSoundBtn" class="btn-icon" title="Speel af met pianogeluid" aria-label="Speel af met pianogeluid">▶🎵</button>
-          <button id="restart" class="btn-ghost">Opnieuw</button>
-          <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
-        </div>
+    <div class="controlGroup">
+      <span class="groupLabel">Afspelen</span>
+      <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
+    </div>
+
+    <div class="controlGroup">
+      <span class="groupLabel">Legenda</span>
+      <div class="legend">
+        <i style="background:#ec8f4c"></i>C-noten &nbsp;
+        <i style="background:#2b2640"></i>overige noten &nbsp;
+        R1 t/m R5 = rechter hand, vinger 1 t/m 5
+      </div>
+      <div class="legend">
+        <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
+        <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
+      </div>
+      <div class="legend" id="handLegend" hidden>
+        De onderste notenbalk (links, L1 t/m L5) is de linkerhand: die staat er alleen bij
+        als voorbeeld en wordt nog niet door de microfoon beoordeeld.
       </div>
     </div>
   </div>
+</aside>
 
-  <div class="warn" id="draftWarn" hidden></div>
-
-  <div class="card searchCard">
+<aside class="panel" id="searchPanel" hidden aria-label="Zoek klassieke stukken">
+  <div class="panelHead">
     <h2>Zoek klassieke stukken</h2>
+    <button type="button" class="icon-btn btn-ghost" id="searchClose" aria-label="Zoeken sluiten">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="panelBody">
     <p class="sub">Zoek een componist of titel op binnen IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. Dit opent een Google-zoekopdracht in een nieuw tabblad (net als IMSLP's eigen zoekvak doet). Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
     <div class="groupRow searchRow">
       <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin nocturne">
-      <button id="musicSearchBtn">Zoek op IMSLP</button>
+      <button type="button" id="musicSearchBtn">Zoek op IMSLP</button>
     </div>
   </div>
+</aside>
 
-  <div class="card addCard">
-    <button id="addToggle" class="btn-ghost" type="button">+ Lied toevoegen (vanaf foto of pdf)</button>
-    <div id="addPanel" hidden>
-      <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
+<aside class="panel" id="addSongPanel" hidden aria-label="Lied toevoegen">
+  <div class="panelHead">
+    <h2>Lied toevoegen</h2>
+    <button type="button" class="icon-btn btn-ghost" id="addClose" aria-label="Lied toevoegen sluiten">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="panelBody">
+    <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
 
+    <div id="addPanel">
       <div class="addLayout">
         <div class="addRef">
           <label class="fileLabel">Foto of pdf van de bladmuziek
@@ -289,31 +446,33 @@
         <label>Tellen per maat <input type="number" id="newBeats" value="4" min="1" max="12"></label>
       </div>
 
-      <span class="groupLabel">Rechterhand</span>
-      <div id="noteRows" class="noteRows"></div>
-      <div class="rowButtons">
-        <button id="addNoteBtn" class="btn-ghost" type="button">+ Noot</button>
-        <button id="addRestBtn" class="btn-ghost" type="button">+ Rust</button>
+      <div class="controlGroup">
+        <span class="groupLabel">Rechterhand</span>
+        <div id="noteRows" class="noteRows"></div>
+        <div class="rowButtons">
+          <button type="button" id="addNoteBtn" class="btn-ghost">+ Noot</button>
+          <button type="button" id="addRestBtn" class="btn-ghost">+ Rust</button>
+        </div>
       </div>
 
-      <span class="groupLabel">Linkerhand (optioneel)</span>
-      <div id="noteRowsLeft" class="noteRows"></div>
-      <div class="rowButtons">
-        <button id="addNoteBtnLeft" class="btn-ghost" type="button">+ Noot</button>
-        <button id="addRestBtnLeft" class="btn-ghost" type="button">+ Rust</button>
+      <div class="controlGroup">
+        <span class="groupLabel">Linkerhand (optioneel)</span>
+        <div id="noteRowsLeft" class="noteRows"></div>
+        <div class="rowButtons">
+          <button type="button" id="addNoteBtnLeft" class="btn-ghost">+ Noot</button>
+          <button type="button" id="addRestBtnLeft" class="btn-ghost">+ Rust</button>
+        </div>
       </div>
 
       <div class="groupRow">
-        <button id="saveSongBtn" type="button">Lied opslaan</button>
+        <button type="button" id="saveSongBtn">Lied opslaan</button>
         <span class="pill" id="addFeedback"></span>
       </div>
     </div>
 
     <div id="customList" class="customList"></div>
   </div>
-
-  <p class="footNote">Pianoklank: opnames van de <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> door Alexander Holm (CC BY 3.0), via <a href="https://tonejs.github.io" target="_blank" rel="noopener">Tone.js</a>.</p>
-</main>
+</aside>
 
 <script>
 // ---------- Liederen (losse data, makkelijk aan te vullen) ----------
@@ -429,7 +588,7 @@ function parseNote(n) {
   const base = (octave + 1) * 12 + SEMI[LETTERS[letter]];
   const midi = base + (accidental === '#' ? 1 : accidental === 'b' ? -1 : 0);
   const step = octave * 7 + LETTERS[letter];
-  return { midi, step, label: n, letter };
+  return { midi, step, label: n, letter, accidental };
 }
 function midiToLabel(m) {
   return NAME_PC[m % 12] + (Math.floor(m / 12) - 1);
@@ -505,6 +664,7 @@ function loadSong(s) {
   const warn = document.getElementById('draftWarn');
   warn.hidden = !s.draft;
   warn.textContent = 'Let op: deze noten, vingerzetting en maatindeling zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
+  document.getElementById('draftBadge').hidden = !s.draft;
   document.getElementById('restart').disabled = true;
   document.getElementById('handLegend').hidden = !s.left;
   setFeedback('Speel de eerste noot, of druk op Speel af.', '');
@@ -573,6 +733,17 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     bassClef.textContent = '\u{1D122}';
   }
 
+  // Maatsoort: altijd een /4-maatsoort in dit datamodel (dur:1 = kwartnoot),
+  // teller is het aantal tellen per maat. Op elke notenbalk van het stuk.
+  function timeSignature(cx, topY, bottomY) {
+    const num = el('text', { x:cx, y:topY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    num.textContent = String(beatsPerMeasure);
+    const den = el('text', { x:cx, y:bottomY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    den.textContent = '4';
+  }
+  timeSignature(82, 118, 158);
+  if (hasLeft) timeSignature(82, 278, 318);
+
   let playhead = null;
   if (!previewMode) {
     // Speelstreep eerst tekenen, zodat de noten erboven liggen.
@@ -613,8 +784,18 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // isActiveHand: de hand die beoordeeld wordt (huidige noot gemarkeerd,
   // gespeelde noten groen) tijdens het oefenen; bij een voorbeeldbalkje (geen
   // activeIdx) staan beide handen gewoon duidelijk leesbaar.
-  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, isActiveHand, handPrefix }) {
+  // middleLineStep: de middelste lijn van de notenbalk, bepaalt de stokrichting
+  // (op of boven de middenlijn: stok omlaag, eronder: stok omhoog).
+  // accState: { measure, shown } bijgehouden per hand, voor voortekens die maar
+  // eenmaal per maat getoond worden, met een herstelteken als dat nodig is.
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState }) {
     const x = px(n, i);
+
+    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
+    if (measureIdx !== accState.measure) {
+      accState.measure = measureIdx;
+      accState.shown = {};
+    }
 
     if (n.rest) {
       const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
@@ -628,6 +809,8 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     const fill = isC ? '#ec8f4c' : '#2b2640';
     const dur = n.dur || 1;
     const hollow = dur >= 2;
+    const hasStem = dur < 4; // een hele noot heeft geen stok
+    const stemUp = n.step <= middleLineStep;
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
@@ -641,6 +824,19 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     }
 
     ledgerLines(x, n.step, yOfFn, bottomLineStep, topLineStep);
+
+    // Voorteken: alleen tonen als het verschilt van wat er dit al in deze maat
+    // voor deze toonhoogte getoond is. Een eerder kruis of mol dat weer naar
+    // onveranderd moet, krijgt een herstelteken.
+    const wanted = n.accidental || '';
+    const prevShown = accState.shown[n.step];
+    const needsSign = prevShown === undefined ? wanted !== '' : prevShown !== wanted;
+    if (needsSign) {
+      const sign = el('text', { x: x - 13, y: y + 5, 'font-size':17, 'text-anchor':'middle', fill, opacity: noteOpacity }, svgEl);
+      sign.textContent = wanted === '#' ? '♯' : wanted === 'b' ? '♭' : '♮';
+    }
+    accState.shown[n.step] = wanted;
+
     el('ellipse', {
       cx:x, cy:y, rx:8, ry:6,
       fill: hollow ? '#fff' : fill,
@@ -648,10 +844,20 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
       'stroke-width': highlight !== 'none' ? 2.5 : 1.8
     }, svgEl);
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
-    if (dur < 1) {
-      // Vlaggetje voor een achtste noot.
-      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity }, svgEl);
+
+    if (hasStem) {
+      // Op of boven de middenlijn: stok omlaag aan de linkerkant van de bol.
+      // Eronder: stok omhoog aan de rechterkant, zoals in gangbare notatie.
+      const stemX = stemUp ? x + 7 : x - 7;
+      const stemEndY = stemUp ? y - 44 : y + 44;
+      el('line', { x1:stemX, x2:stemX, y1:y, y2:stemEndY, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
+      if (dur < 1) {
+        // Vlaggetje voor een achtste noot, gespiegeld naar gelang de stokrichting.
+        const d = stemUp
+          ? `M ${stemX} ${stemEndY} C ${stemX+12} ${stemEndY+4} ${stemX+9} ${stemEndY+14} ${stemX+0.5} ${stemEndY+19}`
+          : `M ${stemX} ${stemEndY} C ${stemX-12} ${stemEndY-4} ${stemX-9} ${stemEndY-14} ${stemX-0.5} ${stemEndY-19}`;
+        el('path', { d, fill, opacity: noteOpacity }, svgEl);
+      }
     }
     if (isDotted(dur)) {
       el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
@@ -662,9 +868,11 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     finger.textContent = handPrefix + n.finger;
   }
 
-  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, isActiveHand: true, handPrefix: 'R' }));
+  const rightAcc = { measure: -1, shown: {} };
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc }));
   if (hasLeft) {
-    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, isActiveHand: false, handPrefix: 'L' }));
+    const leftAcc = { measure: -1, shown: {} };
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc }));
   }
 
   return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
@@ -950,6 +1158,20 @@ function setPlayButtonsState(isPlaying) {
   soundBtn.title = soundBtn.ariaLabel = isPlaying ? 'Stop' : 'Speel af met pianogeluid';
 }
 
+// Houdt de twee afspeelknoppen (met en zonder geluid geforceerd) in dezelfde
+// visuele toestand: beide zijn tijdens het afspelen de stopknop.
+function setPlayButtonsState(isPlaying) {
+  const playBtnEl = document.getElementById('playBtn');
+  playBtnEl.innerHTML = isPlaying ? ICON_STOP : ICON_PLAY;
+  playBtnEl.classList.toggle('is-on', isPlaying);
+  setIconLabel(playBtnEl, isPlaying ? 'Stop' : 'Speel af');
+
+  const soundBtnEl = document.getElementById('playSoundBtn');
+  soundBtnEl.innerHTML = isPlaying ? ICON_STOP : ICON_PLAY_SOUND;
+  soundBtnEl.classList.toggle('is-on', isPlaying);
+  setIconLabel(soundBtnEl, isPlaying ? 'Stop' : 'Speel af met pianogeluid');
+}
+
 function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
@@ -1072,8 +1294,10 @@ async function startMic() {
     src.connect(analyser);
     buf = new Float32Array(analyser.fftSize);
     micOn = true;
-    document.getElementById('micBtn').textContent = 'Microfoon actief';
-    document.getElementById('micBtn').disabled = true;
+    const micBtnEl = document.getElementById('micBtn');
+    micBtnEl.classList.add('is-on');
+    micBtnEl.disabled = true;
+    setIconLabel(micBtnEl, 'Microfoon actief');
     listenTimer = setInterval(listen, 60);
     return true;
   } catch (err) {
@@ -1083,9 +1307,10 @@ async function startMic() {
 }
 
 // Geluidsniveau van een meetbuffer (RMS, root mean square).
-// Was eerst 0.008, toen 0.0025: allebei nog te hoog voor een piano op normale
-// afstand. Een stem vlak bij de microfoon haalt dat makkelijk, een piano niet.
-const RMS_THRESHOLD = 0.001; // onder dit niveau geldt het als stilte
+// Geschiedenis: 0.008, toen 0.0025, toen 0.001, stuk voor stuk nog te hoog voor
+// een piano op normale afstand. Een stem vlak bij de microfoon haalt dat
+// makkelijk, een piano niet.
+const RMS_THRESHOLD = 0.0004; // onder dit niveau geldt het als stilte
 function computeRms(b) {
   let sum = 0;
   for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
@@ -1178,12 +1403,16 @@ let noteState = 'searching'; // 'searching' | 'confirming' | 'tracking'
 let noteCandidate = null;
 let noteCandidateSince = 0;
 let noteSilenceSince = 0;
+let pendingCandidate = null; // afwijkende meting die nog niet vaak genoeg is herhaald
+let pendingCount = 0;
 
 function resetNoteDetection() {
   noteState = 'searching';
   noteCandidate = null;
   noteCandidateSince = 0;
   noteSilenceSince = 0;
+  pendingCandidate = null;
+  pendingCount = 0;
 }
 
 // ---------- Volumemeter: laat zien of er überhaupt geluid binnenkomt ----------
@@ -1214,11 +1443,16 @@ function updateVolMeter(rms) {
 function updateLiveMarker(f1, f2, midi) {
   if (!liveMarker || !liveLabel) return;
 
-  let freq = null, confident = false;
-  if (midi !== null) { freq = f1; confident = true; }
-  else if (f1 || f2) { freq = f1 || f2; confident = false; }
+  let shownMidi = null, confident = false;
+  if (midi !== null) {
+    shownMidi = midi;
+    confident = true;
+  } else if (f1 || f2) {
+    shownMidi = Math.round(69 + 12 * Math.log2((f1 || f2) / 440) - calibrationOffset);
+    confident = false;
+  }
 
-  if (!freq) {
+  if (shownMidi === null) {
     if (performance.now() < liveMarkerHoldUntil) return; // nog even laten staan
     liveMarker.setAttribute('opacity', 0);
     liveLabel.setAttribute('opacity', 0);
@@ -1226,8 +1460,7 @@ function updateLiveMarker(f1, f2, midi) {
   }
   liveMarkerHoldUntil = performance.now() + 500;
 
-  const rawMidi = Math.round(69 + 12 * Math.log2(freq / 440) - calibrationOffset);
-  const noteLabel = midiToLabel(rawMidi);
+  const noteLabel = midiToLabel(shownMidi);
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
@@ -1254,16 +1487,29 @@ function listen() {
   const f2 = detectPitchYIN(buf, audioCtx.sampleRate);
 
   // Alleen vertrouwen als beide detectoren binnen 40 cent (minder dan een halve
-  // toonafstand) van elkaar zitten. Dat filtert octaaffouten en losse ruis eruit.
+  // toonafstand) van elkaar zitten. Dat filtert losse ruis eruit.
+  // Zitten ze precies een octaaf uit elkaar, dan vertrouwen we de laagste: op een
+  // akoestische piano is een boventoon die voor de grondtoon wordt aangezien een
+  // veel voorkomendere fout dan andersom.
   let midi = null;
-  if (f1 && f2 && Math.abs(centsBetween(f1, f2)) < 40) {
-    midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
+  if (f1 && f2) {
+    const cents = centsBetween(f1, f2);
+    if (Math.abs(cents) < 40) {
+      midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
+    } else if (Math.abs(Math.abs(cents) - 1200) < 50) {
+      const lower = Math.min(f1, f2);
+      midi = Math.round(69 + 12 * Math.log2(lower / 440) - calibrationOffset);
+    }
   }
   document.getElementById('heard').textContent = midi !== null ? `Gehoord: ${midiToLabel(midi)}` : 'Gehoord: -';
   updateLiveMarker(f1, f2, midi);
 
-  const now = performance.now();
+  advanceNoteState(midi, performance.now());
+}
 
+// De eigenlijke state machine (zoeken/bevestigen/vasthouden), los van de microfoon
+// en de detectoren zelf, zodat dit ook zonder audio getest kan worden.
+function advanceNoteState(midi, now) {
   if (midi === null) {
     if (noteState !== 'searching') {
       if (!noteSilenceSince) noteSilenceSince = now;
@@ -1273,12 +1519,25 @@ function listen() {
   }
   noteSilenceSince = 0;
 
-  if (midi !== noteCandidate) {
-    // Nieuwe kandidaat-toon, ook als er net nog een andere werd vastgehouden:
-    // opnieuw bevestigen in plaats van de oude noot te blijven volgen.
-    noteCandidate = midi;
-    noteCandidateSince = now;
-    noteState = 'confirming';
+  if (midi === noteCandidate) {
+    // Stabiele meting: een eventuele losse afwijking van daarnet vervalt.
+    pendingCandidate = null;
+    pendingCount = 0;
+  } else {
+    // Afwijkende meting. Pas na twee keer dezelfde afwijking echt wisselen,
+    // zodat één los fout frame (bijvoorbeeld tijdens de hameraanslag) niet de
+    // hele bevestigingsklok reset terwijl de echte toon allang stabiel is.
+    // De allereerste meting mag wel meteen door, er is dan nog niks te verliezen.
+    if (midi === pendingCandidate) pendingCount++;
+    else { pendingCandidate = midi; pendingCount = 1; }
+
+    if (noteCandidate === null || pendingCount >= 2) {
+      noteCandidate = midi;
+      noteCandidateSince = now;
+      noteState = 'confirming';
+      pendingCandidate = null;
+      pendingCount = 0;
+    }
     return;
   }
 
@@ -1396,10 +1655,6 @@ function renderCustomList() {
 }
 
 // ---------- Lied toevoegen: foto/pdf als hulpmiddel, noten met de hand invullen ----------
-document.getElementById('addToggle').addEventListener('click', () => {
-  document.getElementById('addPanel').hidden = !document.getElementById('addPanel').hidden;
-});
-
 document.getElementById('refFile').addEventListener('change', e => {
   const file = e.target.files[0];
   const wrap = document.getElementById('refPreview');
@@ -1607,6 +1862,61 @@ document.getElementById('musicSearchBtn').addEventListener('click', () => {
 });
 document.getElementById('musicSearch').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('musicSearchBtn').click();
+});
+
+// ---------- Icoonknoppen: label/tooltip bijhouden ----------
+function setIconLabel(btn, label) {
+  btn.setAttribute('aria-label', label);
+  const tipId = btn.getAttribute('aria-describedby');
+  const tip = tipId && document.getElementById(tipId);
+  if (tip) tip.textContent = label;
+}
+const ICON_PLAY = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const ICON_STOP = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+const ICON_PLAY_SOUND = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 4.5v15l8-7.5z"/><circle cx="18.5" cy="18" r="2.3"/><rect x="19.6" y="4" width="1.6" height="14.5" rx="0.8"/><path d="M19.6 4l3 1v2.4l-3-1z"/></svg>';
+
+// ---------- Panelen: Instellingen, Zoeken, Lied toevoegen ----------
+// Niet-modaal: de rest van de pagina blijft bereikbaar, maar een klik op de
+// achtergrond of Escape sluit het open paneel weer, net als een gewoon menu.
+const panelBackdrop = document.getElementById('panelBackdrop');
+let openPanelTrigger = null;
+
+function closeAllPanels() {
+  document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
+  document.querySelectorAll('[aria-controls]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+  panelBackdrop.hidden = true;
+  if (openPanelTrigger) { openPanelTrigger.focus(); openPanelTrigger = null; }
+}
+
+function openPanel(panelId, trigger) {
+  const alreadyOpen = !document.getElementById(panelId).hidden;
+  closeAllPanels();
+  if (alreadyOpen) return; // tweede klik op dezelfde knop sluit alleen weer
+  document.getElementById(panelId).hidden = false;
+  panelBackdrop.hidden = false;
+  if (trigger) trigger.setAttribute('aria-expanded', 'true');
+  openPanelTrigger = trigger || null;
+  const focusable = document.getElementById(panelId).querySelector('button, select, input, textarea');
+  if (focusable) focusable.focus();
+}
+
+function wirePanelToggle(triggerId, panelId) {
+  const trigger = document.getElementById(triggerId);
+  trigger.addEventListener('click', () => openPanel(panelId, trigger));
+}
+wirePanelToggle('settingsToggle', 'settingsPanel');
+wirePanelToggle('searchToggle', 'searchPanel');
+wirePanelToggle('addToggle', 'addSongPanel');
+
+document.getElementById('settingsClose').addEventListener('click', closeAllPanels);
+document.getElementById('searchClose').addEventListener('click', closeAllPanels);
+document.getElementById('addClose').addEventListener('click', closeAllPanels);
+panelBackdrop.addEventListener('click', closeAllPanels);
+document.getElementById('draftBadge').addEventListener('click', () => {
+  openPanel('settingsPanel', document.getElementById('settingsToggle'));
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !panelBackdrop.hidden) closeAllPanels();
 });
 
 // ---------- Knoppen ----------
