@@ -686,9 +686,9 @@ async function startMic() {
 }
 
 // Geluidsniveau van een meetbuffer (RMS, root mean square).
-// Was 0.008, maar dat bleek te hoog voor een piano op normale afstand: een stem
-// vlak bij de microfoon haalt dat makkelijk, een piano een meter verderop niet.
-const RMS_THRESHOLD = 0.0025; // onder dit niveau geldt het als stilte
+// Was eerst 0.008, toen 0.0025: allebei nog te hoog voor een piano op normale
+// afstand. Een stem vlak bij de microfoon haalt dat makkelijk, een piano niet.
+const RMS_THRESHOLD = 0.001; // onder dit niveau geldt het als stilte
 function computeRms(b) {
   let sum = 0;
   for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
