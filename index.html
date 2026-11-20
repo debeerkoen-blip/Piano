@@ -988,6 +988,13 @@ let notes = [];
 let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let noteResults = []; // per noot-index: 'hit' | 'missed' | undefined (nog niet aan de beurt geweest)
+// passedIdx: hoort bij idx, maar puur op basis van de rode speelstreep (geen
+// tijdvenster/marge). idx mag door MISS_GRACE_MS en een ruim niveau-tijdvenster
+// best een stukje achterblijven (bewust, voor de scoring), maar dat zorgde
+// ervoor dat noten pas lang nadat de streep ze gepasseerd was verkleurden.
+// passedIdx bepaalt die kleur meteen; noteResults (hit/missed) wint daar
+// altijd van, dus een late maar nog geldige treffer kleurt alsnog groen.
+let passedIdx = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
 let metronomeOn = false;
@@ -1032,7 +1039,7 @@ function loadSong(s) {
   beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
-  idx = 0; wrongs = 0; streak = 0; noteResults = [];
+  idx = 0; wrongs = 0; streak = 0; noteResults = []; passedIdx = 0;
   skipRests();
   document.getElementById('title').textContent = s.title;
   const warn = document.getElementById('draftWarn');
@@ -1198,10 +1205,16 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
-        const done = i < activeIdx;
+        // "done" is hier passedIdx tijdens Speel af: de streep is de noot voorbij,
+        // met of zonder officieel oordeel van idx/noteResults (groen alleen als
+        // 'ie echt, eventueel later nog binnen het venster, goed gespeeld is).
+        // De noteResults-uitzondering houdt een eerder oordeel vast als je
+        // terugscrolt: passedIdx zakt dan weer, maar een al beoordeelde noot mag
+        // niet terugspringen naar "nog te doen".
+        const done = i < activeIdx || noteResults[i] !== undefined;
         const current = i === activeIdx;
         noteOpacity = (done || current) ? 1 : 0.45;
-        highlight = done ? (noteResults[i] === 'missed' ? '#d9495f' : '#1f8f68') : current ? '#8c73e8' : 'none';
+        highlight = done ? (noteResults[i] === 'hit' ? '#1f8f68' : '#d9495f') : current ? '#8c73e8' : 'none';
       } else {
         noteOpacity = 0.4;
       }
@@ -1299,7 +1312,11 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
 }
 
 function render() {
-  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx);
+  // Tijdens Speel af kleurt de notenbalk op passedIdx (puur de rode speelstreep,
+  // geen venster/marge), niet op idx (de scoring-pointer, die bewust wat coulance
+  // heeft): zie de toelichting bij passedIdx hierboven. Buiten Speel af (oefenen,
+  // een lied laden) is er geen speelstreep en zijn idx/passedIdx gelijk.
+  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, playing ? passedIdx : idx);
   phRect = playhead;
 
   // Los van de SVG (die zijwaarts kan scrollen) zodat deze tekst altijd
@@ -1699,7 +1716,7 @@ function setPlayButtonsState(isPlaying) {
 function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
-  idx = 0; wrongs = 0; streak = 0; noteResults = [];
+  idx = 0; wrongs = 0; streak = 0; noteResults = []; passedIdx = 0;
   skipRests();
   playing = true;
   beatMs = 60000 / song.bpm / tempoScale;
@@ -1753,6 +1770,12 @@ function seekTo(targetT) {
   }
   idx = newIdx;
   skipRests();
+  // newIdx is hier al "de eerste noot die targetT nog niet voorbij is", exact
+  // dezelfde definitie als waar passedIdx's eigen lus in tick() naartoe loopt
+  // voor dat tijdstip. Terugscrollen laat eerder gepasseerde (nog niet
+  // beoordeelde) noten dus weer gewoon als "nog te doen" zien; al beoordeelde
+  // noten blijven hun kleur houden via noteResults, zie drawNote.
+  passedIdx = newIdx;
 
   // Geen aftellen: startT zo zetten dat tick() meteen op targetT uitkomt.
   startT = performance.now() - (targetT + COUNT_IN) * beatMs;
@@ -1812,7 +1835,18 @@ function tick(now) {
       missed = true;
       setFeedback(`Gemist: ${m.label} met R${m.finger}`, 'bad');
     }
-    if (missed) { render(); updateStats(); }
+
+    // passedIdx loopt los van idx mee, zonder venster/marge: zodra de streep een
+    // noot voorbij is, telt 'ie als gepasseerd voor de kleur op de notenbalk, ook
+    // al heeft idx 'm (dankzij het ruimere niveau-venster/MISS_GRACE_MS) nog niet
+    // definitief afgeschreven. Speel je 'm alsnog op tijd (binnen dat venster),
+    // dan kleurt-ie via noteResults alsnog groen in plaats van rood.
+    let passed = false;
+    while (passedIdx < notes.length && (notes[passedIdx].rest || t > notes[passedIdx].start + notes[passedIdx].dur)) {
+      passedIdx++;
+      passed = true;
+    }
+    if (missed || passed) { render(); updateStats(); }
 
     if (idx >= notes.length) {
       stopPlay(true);
