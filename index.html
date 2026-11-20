@@ -1068,12 +1068,16 @@ let noteState = 'searching'; // 'searching' | 'confirming' | 'tracking'
 let noteCandidate = null;
 let noteCandidateSince = 0;
 let noteSilenceSince = 0;
+let pendingCandidate = null; // afwijkende meting die nog niet vaak genoeg is herhaald
+let pendingCount = 0;
 
 function resetNoteDetection() {
   noteState = 'searching';
   noteCandidate = null;
   noteCandidateSince = 0;
   noteSilenceSince = 0;
+  pendingCandidate = null;
+  pendingCount = 0;
 }
 
 // ---------- Volumemeter: laat zien of er überhaupt geluid binnenkomt ----------
@@ -1163,8 +1167,12 @@ function listen() {
   document.getElementById('heard').textContent = midi !== null ? `Gehoord: ${midiToLabel(midi)}` : 'Gehoord: -';
   updateLiveMarker(f1, f2, midi);
 
-  const now = performance.now();
+  advanceNoteState(midi, performance.now());
+}
 
+// De eigenlijke state machine (zoeken/bevestigen/vasthouden), los van de microfoon
+// en de detectoren zelf, zodat dit ook zonder audio getest kan worden.
+function advanceNoteState(midi, now) {
   if (midi === null) {
     if (noteState !== 'searching') {
       if (!noteSilenceSince) noteSilenceSince = now;
@@ -1174,12 +1182,25 @@ function listen() {
   }
   noteSilenceSince = 0;
 
-  if (midi !== noteCandidate) {
-    // Nieuwe kandidaat-toon, ook als er net nog een andere werd vastgehouden:
-    // opnieuw bevestigen in plaats van de oude noot te blijven volgen.
-    noteCandidate = midi;
-    noteCandidateSince = now;
-    noteState = 'confirming';
+  if (midi === noteCandidate) {
+    // Stabiele meting: een eventuele losse afwijking van daarnet vervalt.
+    pendingCandidate = null;
+    pendingCount = 0;
+  } else {
+    // Afwijkende meting. Pas na twee keer dezelfde afwijking echt wisselen,
+    // zodat één los fout frame (bijvoorbeeld tijdens de hameraanslag) niet de
+    // hele bevestigingsklok reset terwijl de echte toon allang stabiel is.
+    // De allereerste meting mag wel meteen door, er is dan nog niks te verliezen.
+    if (midi === pendingCandidate) pendingCount++;
+    else { pendingCandidate = midi; pendingCount = 1; }
+
+    if (noteCandidate === null || pendingCount >= 2) {
+      noteCandidate = midi;
+      noteCandidateSince = now;
+      noteState = 'confirming';
+      pendingCandidate = null;
+      pendingCount = 0;
+    }
     return;
   }
 
