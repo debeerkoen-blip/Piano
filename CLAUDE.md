@@ -55,6 +55,14 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tegelijk, dus allebei de handen tegelijk beoordelen kan nog niet betrouwbaar. De linkerhand
   staat er gedimd bij als voorbeeld en klinkt wel mee bij "Speel af" met geluid aan. "Lied
   toevoegen" heeft een los rijenblok voor de linkerhand (optioneel).
+- Akkoorden: alleen bij de linkerhand (om dezelfde reden als hierboven: de microfoon herkent
+  maar één toon tegelijk, dus de rechterhand blijft monofoon). Op een tel staat dan een lijst
+  notenamen (`['C3','E3','G3']`) in plaats van één naam. De notenbalk tekent dat als gestapelde
+  notenkoppen met één gedeelde stok (stokrichting op de toonhoogte die het verst van de
+  middenlijn afstaat) en een voorteken per toonhoogte; bij "Speel af" klinken alle tonen van het
+  akkoord gelijktijdig. "Lied toevoegen" heeft een "+ akkoord"-knop per rij in het
+  linkerhandblok, die een extra toonhoogte-kiezer toevoegt (alleen daar, niet bij de
+  rechterhand).
 - Automatisch noten uit een foto/pdf lezen (optical music recognition) doet de app zelf niet: dat
   vraagt een externe beeldherkenningsdienst en dus een server, wat niet past bij één bestand
   zonder build-stap, en de uitkomst op een foto is sowieso niet gegarandeerd correct. In plaats
@@ -80,7 +88,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 1. Testen op telefoon en laptop. Timing-venster en detectiedrempels afstellen.
 2. Voortgang opslaan in localStorage.
 3. Linkerhand ook kunnen oefenen (niet alleen tonen): bijvoorbeeld een handkeuze naast Niveau,
-   die bepaalt welke hand de microfoon beoordeelt. Akkoorden (meerdere noten tegelijk) later.
+   die bepaalt welke hand de microfoon beoordeelt. Akkoorden bij de rechterhand (en ze laten
+   meebeoordelen door de microfoon) staat hier ook nog: dat vraagt polyfone toonhoogteherkenning,
+   iets heel anders dan de huidige twee monofone detectoren.
 4. Spotify-koppeling: liked songs als wensenlijst, met een voortgangsbalk per nummer.
 5. Losse modules splitsen (audio, notenbalk, spelmotor) zodra het groter wordt.
 6. "Lied toevoegen": noten uit een pdf met meerdere bladzijdes.
