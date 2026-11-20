@@ -157,6 +157,8 @@
   }
   select, input[type="text"] { background:var(--surface); border-color:var(--border); color:var(--ink); font-weight:400; }
   select { min-width:170px; }
+  .songRow { flex-wrap:nowrap; }
+  #song { flex:1 1 auto; min-width:0; }
   button { cursor:pointer; color:var(--ink); background:var(--lavender); font-weight:600; }
   button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .btn-ghost { background:var(--surface); border-color:var(--border); }
@@ -334,6 +336,12 @@
         </button>
         <span class="tooltip" id="tip-restart" role="tooltip">Opnieuw beginnen</span>
       </span>
+      <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn btn-ghost" id="metronomeBtn" aria-describedby="tip-metronome" aria-label="Metronoom aan">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21h6l-1.5-16h-3z"/><path d="M12 7v10"/><circle cx="14.4" cy="12.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <span class="tooltip" id="tip-metronome" role="tooltip">Metronoom aan</span>
+      </span>
 
       <span class="toolbarSpacer" aria-hidden="true"></span>
 
@@ -348,12 +356,6 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
         <span class="tooltip" id="tip-search" role="tooltip">Zoek klassieke stukken</span>
-      </span>
-      <span class="icon-btn-wrap">
-        <button type="button" class="icon-btn btn-ghost" id="addToggle" aria-expanded="false" aria-controls="addSongPanel" aria-describedby="tip-add" aria-label="Lied toevoegen">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <span class="tooltip" id="tip-add" role="tooltip">Lied toevoegen</span>
       </span>
     </div>
 
@@ -394,7 +396,15 @@
 
     <div class="controlGroup">
       <span class="groupLabel">Lied</span>
-      <select id="song"></select>
+      <div class="groupRow songRow">
+        <select id="song"></select>
+        <span class="icon-btn-wrap">
+          <button type="button" class="icon-btn btn-ghost" id="addToggle" aria-expanded="false" aria-controls="addSongPanel" aria-describedby="tip-add" aria-label="Lied toevoegen">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <span class="tooltip" id="tip-add" role="tooltip">Lied toevoegen</span>
+        </span>
+      </div>
     </div>
 
     <div class="controlGroup">
@@ -688,6 +698,7 @@ let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoor
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
+let metronomeOn = false;
 let phRect = null, liveMarker = null, liveLabel = null;
 let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
 
@@ -1074,6 +1085,20 @@ function getNoiseBuffer(ctx) {
   return buffer;
 }
 
+function scheduleMetronomeTick(when, accent) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = accent ? 1500 : 1000;
+  gain.gain.setValueAtTime(accent ? 0.18 : 0.11, when);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when + 0.05);
+  scheduledSources.push(osc);
+}
+
 function scheduleHammerNoise(when, freq) {
   const src = audioCtx.createBufferSource();
   src.buffer = getNoiseBuffer(audioCtx);
@@ -1234,23 +1259,37 @@ function startPlay(forceSound = false) {
   render();
   updateStats();
 
-  if ((forceSound || document.getElementById('soundToggle').checked) && audioCtx) {
+  if (audioCtx) {
     const beatSec = beatMs / 1000;
-    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
-    // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
-    // tussen de handen te horen.
-    const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
-    // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
-    // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
-    // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
-    // op null en gebruiken we de synthese.
-    loadPianoSamples(audioCtx).finally(() => {
-      if (!playing) return; // intussen gestopt, niet meer plannen
-      const audioStart = audioCtx.currentTime;
-      noteList.forEach(n => {
-        scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
+    const audioStart = audioCtx.currentTime;
+
+    if (metronomeOn) {
+      const beatsPerMeasure = song.beatsPerMeasure || 4;
+      for (let c = 0; c < COUNT_IN; c++) {
+        scheduleMetronomeTick(audioStart + c * beatSec, c === 0);
+      }
+      const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
+      for (let b = 0; b < songBeats; b++) {
+        scheduleMetronomeTick(audioStart + (COUNT_IN + b) * beatSec, b % beatsPerMeasure === 0);
+      }
+    }
+
+    if (forceSound || document.getElementById('soundToggle').checked) {
+      // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
+      // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
+      // tussen de handen te horen.
+      const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
+      // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
+      // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
+      // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
+      // op null en gebruiken we de synthese.
+      loadPianoSamples(audioCtx).finally(() => {
+        if (!playing) return; // intussen gestopt, niet meer plannen
+        noteList.forEach(n => {
+          scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
+        });
       });
-    });
+    }
   }
 
   rafId = requestAnimationFrame(tick);
@@ -2030,6 +2069,13 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 });
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
+
+document.getElementById('metronomeBtn').addEventListener('click', (e) => {
+  metronomeOn = !metronomeOn;
+  const btn = e.currentTarget;
+  btn.classList.toggle('is-on', metronomeOn);
+  setIconLabel(btn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+});
 
 document.getElementById('playBtn').addEventListener('click', async () => {
   if (playing) { stopPlay(false); return; }
