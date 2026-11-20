@@ -96,9 +96,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
-  herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
-  los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
-  noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
+  herhaling). Achtste noten die binnen dezelfde tel op elkaar volgen krijgen een gezamenlijke balk
+  (`computeBeamGroups`/`buildBeamLookup`) in plaats van elk een los vlaggetje; een achtste die
+  alleen in zijn tel staat (bijvoorbeeld na een gestippelde noot, of onderbroken door een rust)
+  krijgt nog gewoon een vlaggetje. Nog niet geïmplementeerd: een echte toonsoort/voortekening
+  (elke verhoging/verlaging staat los bij de noot, er is geen mol- of kruisvoortekening aan het
+  begin van de balk).
 - Speel af: een balk loopt over de noten met aftellen (4 tellen). Tijdens het aftellen zelf
   staat er een zachte, halfdoorzichtige lay-over (`#countInOverlay`) met een groot cijfer
   boven op de notenbalk, in plaats van alleen tekst in de feedback.
@@ -225,7 +228,11 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   best-effort no-cache meta-tags in de `<head>`, maar browsers negeren die meestal voor de
   echte HTTP-cache.
 - Ode an de vreugde: noten en vingerzetting zijn uit het hoofd ingevuld, nog niet gecontroleerd.
-- Gymnopédie nr. 1: concept (`draft: true`). Controleer tegen de partituur op IMSLP (publiek domein) voordat je die gebruikt.
+- Gymnopédie nr. 1: nog `draft: true`, maar de noten en duren komen nu uit een machineleesbare
+  bron (Mutopia Project, zie de toelichting in `SONGS`), niet meer van een foto. Wat nog wel
+  eigen werk is: vingerzetting (zelf bedacht, niet gecontroleerd) en een paar vereenvoudigingen
+  waar de bron meer stemmen tegelijk heeft dan de app kan weergeven (zie de toelichting bij het
+  lied zelf voor precies welke maten).
 - Sinterklaas (Daar wordt aan de deur geklopt): concept (`draft: true`), overgetypt van een foto
   van de bladmuziek, inclusief linkerhand. Vingerzetting is alleen zeker op de plekken waar de
   partituur een cijfer gaf; daartussen is dat cijfer aangehouden. Het laatste akkoord van de

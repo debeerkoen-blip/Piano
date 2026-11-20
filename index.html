@@ -669,133 +669,243 @@ const SONGS = [
     bpm: 52,
     beatsPerMeasure: 3,
     draft: true,
-    // Overgetypt van drie foto's van een MuseScore-weergave (D-majeur, 2 kruizen,
-    // 3/4, "Lent et douloureux"), maat 1 t/m 78 (hele stuk, eindigt op de dubbele
-    // maatstreep). Dit is een beste-poging transcriptie, geen zekere bron:
-    // - De linkerhand is in de bron op elke tel 1 een akkoord (kwartrust + akkoord
-    //   dat de rest van de maat klinkt), op een lage baston daaronder. De app kent
-    //   geen akkoorden, dus is per maat teruggebracht tot die ene baston (de noot
-    //   op de hulplijn onder de notenbalk), als gestippelde halve noot.
-    // - Het siertje (een "turn") boven maat 26 en 31 is niet in de noten verwerkt.
-    // - Of sommige groepjes van 3 noten achtste noten of kwartnoten zijn kon niet
-    //   met zekerheid uit de foto's afgelezen worden; hier als kwartnoten genomen.
-    // - Vingerzetting staat nergens in de bron en is hier zelf bedacht, niet
-    //   gecontroleerd.
-    // Onzeker (controleer tegen IMSLP voor dit serieus geoefend wordt):
-    // - Herstel- en kruistekens rond maat 22-24, 27-29, 31-32, 52-54, 61-63,
-    //   66-68 en 71-76: de app houdt een herstelteken alleen binnen de maat aan
-    //   (notatieregel), maar of de precieze noten C/F zijn (en niet een andere
-    //   toonhoogte) kon niet op de pixel af gecontroleerd worden.
-    // - Maat 37-39: de bron laat hier een paar samengebalkte/akkoordachtige
-    //   notenkoppen in de rechterhand zien; vereenvoudigd tot één melodienoot
-    //   per maat.
-    // - Maat 65 en 70: notenwaarde (halve vs. gestippelde halve noot) onzeker,
-    //   hier als gestippelde halve genomen.
-    // - Alle baston-toonhoogtes in de linkerhand: afgelezen op hulplijnen onder de
-    //   bassleutel, lastig op de foto; harmonische richting (G/D/A versus C/F bij
-    //   de herstelteken-maten) is aannemelijk maar niet zeker.
+    // Volledig overgetypt (alle 78 maten) uit een machineleesbare bron in plaats van
+    // van een foto: de LilyPond-bron en het meegeleverde MIDI-bestand van Mutopia
+    // Project (publiek domein, mutopiaproject.org/ftp/SatieE/gymnopedie_1/), dezelfde
+    // uitgave als IMSLP's MuseScore-bestand maar zonder IMSLP's eigen bot-blokkade.
+    // De partituur zelf schrijft het stuk twee keer helemaal uit (maat 1-31 twee keer,
+    // met een andere laatste acht maten de tweede keer) in plaats van met een
+    // herhalingsteken; de LilyPond-bron gebruikt wel een herhaling (korter om te
+    // schrijven) maar legt in een commentaar uit dat dat identiek klinkt aan de
+    // voluit geschreven partituur. Maat 1-31 en 40-70 zijn daarom identiek: allebei
+    // rechtstreeks uit diezelfde brongegevens, niet met de hand gekopieerd.
+    // Dit verving een eerdere pixelmeet-transcriptie (van een foto) die op meerdere
+    // plekken mis bleek te zitten: zowel in maat 6-21 (eerder al eens gecorrigeerd)
+    // als, bleek nu, in delen van maat 26-78 die nog nooit tegen een bron gecontroleerd
+    // waren. De toonhoogtes en notenwaarden hieronder komen nu rechtstreeks uit de
+    // MIDI-weergave van de partituur, niet meer van het oog.
+    // - Linkerhand: de bron heeft op de meeste plekken twee stemmen tegelijk, een
+    //   lage baston die de hele maat doorklinkt plus een akkoord erboven op tel 2-3.
+    //   Zo'n overlap kan de app niet (één stem per hand): in plaats daarvan klinkt
+    //   tel 1 de baston alleen, en tel 2-3 de baston samen met het akkoord als één
+    //   akkoord. Klinkt samen hetzelfde, staat anders genoteerd dan in de bron.
+    //   Maat 37 en 45 hebben zelfs drie stemmen tegelijk (baston plus twee korte
+    //   akkoordjes op tel 2 en 3); die drie zijn samengevoegd tot twee akkoorden
+    //   (baston+akkoord per tel), dat is de grootste eigen vereenvoudiging hier.
+    // - Rechterhand maat 38, 39, 46 en 47: de bron heeft hier een echt akkoord in de
+    //   melodie (vier gestapelde noten), niet een enkele toon. De rechterhand blijft
+    //   in deze app altijd monofoon (zie Huidige stand, Akkoorden), dus daarvan is
+    //   steeds de bovenste noot genomen als melodietoon.
+    // - Vingerzetting staat niet in de bron (een MIDI-bestand heeft geen vingerzetting)
+    //   en is hier zelf bedacht met een simpel contour-patroon (op- of aflopend volgt
+    //   de vorige vinger), niet gecontroleerd en niet per se prettig speelbaar.
     notes: [
       // m1-5
-      null,null,null,null,  null,'F#5','A5',
+      null,  null,  null,  null,  null,'F#5','A5',
       // m6-10
-      'B5','A5','G5',  'F#5','E5','D5',  'E5',  'F#5',  'D5',
+      'G5','F#5','C#5',  'B4','C#5','D5',  'A4',  'F#4',  'F#4',
       // m11-15
-      'D5',  'D5',  null,'E5','F#5',  'G5','F#5','E5',  'D5','C#5','B4',
+      'F#4',  'F#4',  null,'F#5','A5',  'G5','F#5','C#5',  'B4','C#5','D5',
       // m16-20
-      'A4',  'B4',  'C#5',  'D5',  'D5',
+      'A4',  'C#5',  'F#5',  'E4',  'E4',
       // m21-25
-      'D5',  'C5','B4','A4',  'G4','F4','E4',  'D4','E4','F#4',  'G4',
+      'E4',  'A4','B4','C5',  'E5','D5','B4',  'D5','C5','B4',  'D5',
       // m26-30
-      'A4',  'B4','A4','F4',  'G4','F4','E4',  'D4','C4','B3',  'A3',
+      'D5','D5',  'E5','F5','G5',  'A5','C5','D5',  'E5','D5','B4',  'D5',
       // m31-35
-      'B3',  'C4',  'D4','E4','F#4',  'G4','F#4','E4',  'D4',
+      'D5','D5',  'G5',  'F#5',  'B4','A4','B4',  'C#5','D5','E5',
       // m36-40
-      'E4','F#4','G4',  'A4','B4','C5',  'D5',  'C5',  null,
+      'C#5','D5','E5',  'F#4',  'C5',  'D5',  null,
       // m41-45
-      null,null,null,  null,'D5','F#5',  'G5','F#5','E5',
-      // m46-51
-      'D5','C#5','B4',  'A4',  'B4',  'B4',  'B4',  'B4',
-      // m52-56
-      null,'C5','D5',  'E5','D5','C5',  'B4','A4','G4',  'F#4',  'G4',
-      // m57-62
-      'A4',  'A4',  'A4',  'A4',  'B4','C5','D5',  'E5','F5','G5',
-      // m63-67
-      'A5','G5','F5',  'E5',  'E5',  'D5','C5','B4',  'A4','B4','C5',
-      // m68-73
-      'D5','C5','B4',  'A4',  'G4',  'A4',  'B4',  'C5','B4','A4',
-      // m74-78
-      'G4','F4','E4',  'D4','C4','B3',  'C4',  'D4',  'D4'
+      null,  null,  null,  null,'F#5','A5',  'G5','F#5','C#5',
+      // m46-50
+      'B4','C#5','D5',  'A4',  'F#4',  'F#4',  'F#4',
+      // m51-55
+      'F#4',  null,'F#5','A5',  'G5','F#5','C#5',  'B4','C#5','D5',  'A4',
+      // m56-60
+      'C#5',  'F#5',  'E4',  'E4',  'E4',
+      // m61-65
+      'A4','B4','C5',  'E5','D5','B4',  'D5','C5','B4',  'D5',  'D5','D5',
+      // m66-70
+      'E5','F5','G5',  'A5','C5','D5',  'E5','D5','B4',  'D5',  'D5','D5',
+      // m71-75
+      'G5',  'F5',  'B4','C5','F5',  'E5','D5','C5',  'E5','D5','C5',
+      // m76-78
+      'F4',  'C5',  'D5',
     ],
     durations: [
-      3,3,3,3,  1,1,1,
+      // m1-5
+      3,  3,  3,  3,  1,1,1,
+      // m6-10
       1,1,1,  1,1,1,  3,  3,  3,
+      // m11-15
       3,  3,  1,1,1,  1,1,1,  1,1,1,
+      // m16-20
       3,  3,  3,  3,  3,
+      // m21-25
       3,  1,1,1,  1,1,1,  1,1,1,  3,
+      // m26-30
+      2,1,  1,1,1,  1,1,1,  1,1,1,  3,
+      // m31-35
+      2,1,  3,  3,  1,1,1,  1,1,1,
+      // m36-40
+      1,1,1,  3,  3,  3,  3,
+      // m41-45
+      3,  3,  3,  1,1,1,  1,1,1,
+      // m46-50
+      1,1,1,  3,  3,  3,  3,
+      // m51-55
       3,  1,1,1,  1,1,1,  1,1,1,  3,
-      3,  3,  1,1,1,  1,1,1,  3,
-      1,1,1,  1,1,1,  3,  3,  3,
-      3,3,3,  1,1,1,  1,1,1,
-      1,1,1,  3,  3,  3,  3,  3,
-      1,1,1,  1,1,1,  1,1,1,  3,  3,
-      3,  3,  3,  3,  1,1,1,  1,1,1,
-      1,1,1,  3,  3,  1,1,1,  1,1,1,
-      1,1,1,  3,  3,  3,  3,  1,1,1,
-      1,1,1,  1,1,1,  3,  3,  3
+      // m56-60
+      3,  3,  3,  3,  3,
+      // m61-65
+      1,1,1,  1,1,1,  1,1,1,  3,  2,1,
+      // m66-70
+      1,1,1,  1,1,1,  1,1,1,  3,  2,1,
+      // m71-75
+      3,  3,  1,1,1,  1,1,1,  1,1,1,
+      // m76-78
+      3,  3,  3,
     ],
     fingers: [
-      null,null,null,null,  null,2,4,
-      3,2,1,  3,2,1,  3,  3,  3,
-      3,  3,  null,2,3,  3,2,1,  3,2,1,
-      3,  3,  3,  3,  3,
-      3,  3,2,1,  3,2,1,  1,2,3,  3,
-      3,  3,2,1,  3,2,1,  3,2,1,  3,
-      3,  3,  1,2,3,  3,2,1,  3,
-      1,2,3,  1,2,3,  3,  3,  null,
-      null,null,null,  null,2,3,  3,2,1,
-      3,2,1,  3,  3,  3,  3,  3,
-      null,2,3,  3,2,1,  3,2,1,  3,  3,
-      3,  3,  3,  3,  1,2,3,  1,2,3,
-      3,2,1,  3,  3,  3,2,1,  1,2,3,
-      3,2,1,  3,  3,  3,  3,  3,2,1,
-      3,2,1,  3,2,1,  3,  3,  3
+      // m1-5
+      null,  null,  null,  null,  null,3,4,
+      // m6-10
+      3,2,3,  2,3,4,  3,  2,  2,
+      // m11-15
+      2,  2,  null,3,4,  3,2,3,  2,3,4,
+      // m16-20
+      3,  4,  3,  3,  3,
+      // m21-25
+      3,  3,4,5,  5,4,3,  4,3,2,  3,
+      // m26-30
+      3,3,  4,5,5,  5,3,4,  5,4,3,  4,
+      // m31-35
+      4,4,  3,  2,  3,2,3,  4,5,5,
+      // m36-40
+      4,5,5,  3,  3,  4,  null,
+      // m41-45
+      null,  null,  null,  null,3,4,  3,2,3,
+      // m46-50
+      2,3,4,  3,  2,  2,  2,
+      // m51-55
+      2,  null,3,4,  3,2,3,  2,3,4,  3,
+      // m56-60
+      4,  3,  3,  3,  3,
+      // m61-65
+      3,4,5,  5,4,3,  4,3,2,  3,  3,3,
+      // m66-70
+      4,5,5,  5,3,4,  5,4,3,  4,  4,4,
+      // m71-75
+      3,  2,  3,4,3,  2,1,1,  2,1,1,
+      // m76-78
+      3,  3,  4,
     ],
-    // Linkerhand: per maat de baston (zie uitleg hierboven). Klinkt mee bij
+    // Linkerhand: zie toelichting hierboven (baston + akkoord als één akkoord op
+    // tel 2-3, of bij maat 37/45 twee van die akkoorden na elkaar). Klinkt mee bij
     // "Speel af" met geluid aan; wordt (nog) niet beoordeeld door de microfoon.
     left: {
       notes: [
-        'G2','G2','G2','G2','G2',
-        'D3','A2','D3','G2','D3',
-        'G2','D3','G2','D3','A2',
-        'D3','G2','D3','G2','D3',
-        'G2','C3','F2','C3','F2',
-        'G2','C3','F2','C3','F2',
-        'G2','C3','G2','D3','G2',
-        'D3','G2','D3','C3','F2',
-        'G2','D3','G2','D3','G2',
-        'D3','G2','D3','G2','D3',
-        'G2','C3','F2','C3','F2',
-        'G2','D3','G2','D3','G2',
-        'C3','F2','C3','F2','G2',
-        'C3','F2','C3','G2','D3',
-        'G2','C3','F2','C3','F2',
-        'C3','G2','D3'
+      // m1-5
+      'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],
+      // m6-10
+      'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],
+      // m11-15
+      'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],
+      // m16-20
+      'D2',['D2','A3','C#4','F#4'],  'F#2',['F#2','A3','C#4','F#4'],  'B1',['B1','B3','D4','F#4'],  'E2',['E2','G3','B3'],  'E2',['E2','B3','D4','G4'],
+      // m21-25
+      'D2',['D2','F3','A3','D4'],  'A1',['A1','A3','C4','E4'],  'D2',['D2','G3','B3','E4'],  'D2',['D2','D3','G3','B3','E4'],  'D2',['D2','C3','E3','A3','D4'],
+      // m26-30
+      'D2',['D2','C3','F#3','A3','D4'],  'D2',['D2','A3','C4','F4'],  'D2',['D2','A3','C4','E4'],  'D2',['D2','D3','G3','B3','E4'],  'D2',['D2','C3','E3','A3','D4'],
+      // m31-35
+      'D2',['D2','C3','F#3','A3','D4'],  'E2',['E2','B3','E4','G4'],  'F#2',['F#2','A3','C#4','F#4'],  'B1',['B1','B3','D4','F#4'],  'E2',['E2','C#4','E4','A4'],
+      // m36-40
+      'E2',['E2','A3','C#4','F#4','A4'],  'E2',['E2','B2','A3','D4'],['E2','E3','B3','D4','G4'],  ['A2','G3'],  ['D2','A2','D3'],  'G2',['G2','B3','D4','F#4'],
+      // m41-45
+      'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],
+      // m46-50
+      'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],
+      // m51-55
+      'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],  'G2',['G2','B3','D4','F#4'],  'D2',['D2','A3','C#4','F#4'],
+      // m56-60
+      'F#2',['F#2','A3','C#4','F#4'],  'B1',['B1','B3','D4','F#4'],  'E2',['E2','G3','B3'],  'E2',['E2','B3','D4','G4'],  'D2',['D2','F3','A3','D4'],
+      // m61-65
+      'A1',['A1','A3','C4','E4'],  'D2',['D2','G3','B3','E4'],  'D2',['D2','D3','G3','B3','E4'],  'D2',['D2','C3','E3','A3','D4'],  'D2',['D2','C3','F#3','A3','D4'],
+      // m66-70
+      'D2',['D2','A3','C4','F4'],  'D2',['D2','A3','C4','E4'],  'D2',['D2','D3','G3','B3','E4'],  'D2',['D2','C3','E3','A3','D4'],  'D2',['D2','C3','F#3','A3','D4'],
+      // m71-75
+      'E2',['E2','B3','E4','G4'],  'E2',['E2','A3','D4','F4','A4'],  'E2',['E2','A3','C4','F4'],  'E2',['E2','C4','E4','A4'],  'E2',['E2','A3','C4','F4','A4'],
+      // m76-78
+      'E2',['E2','B2','A3','D4'],['E2','E3','B3','D4','G4'],  ['A2','G3'],  ['D2','A2','D3'],
       ],
       durations: [
-        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
-        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
-        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
-        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
-        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
-        3,3,3
+      // m1-5
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m6-10
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m11-15
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m16-20
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m21-25
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m26-30
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m31-35
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m36-40
+      1,2,  1,1,1,  3,  3,  1,2,
+      // m41-45
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m46-50
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m51-55
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m56-60
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m61-65
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m66-70
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m71-75
+      1,2,  1,2,  1,2,  1,2,  1,2,
+      // m76-78
+      1,1,1,  3,  3,
       ],
       fingers: [
-        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
-        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
-        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
-        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
-        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
-        5,5,5
+      // m1-5
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m6-10
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m11-15
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m16-20
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m21-25
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m26-30
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m31-35
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m36-40
+      5,5,  5,5,5,  5,  5,  5,5,
+      // m41-45
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m46-50
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m51-55
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m56-60
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m61-65
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m66-70
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m71-75
+      5,5,  5,5,  5,5,  5,5,  5,5,
+      // m76-78
+      5,5,5,  5,  5,
       ]
     }
   },
@@ -1126,6 +1236,74 @@ function updateStats() {
 // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
 const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
 
+// Groepeert aaneengesloten achtste noten binnen dezelfde tel tot één balkgroep,
+// in plaats van dat elke achtste noot een los vlaggetje krijgt (gangbare notatie
+// bij een /4-maatsoort: er wordt per tel gebalkt). Een rust, een andere
+// nootwaarde, of de grens van de tel breekt een groep af. Een groep van 1
+// (geïsoleerde achtste) krijgt nog gewoon een vlaggetje, zoals voorheen.
+// Een akkoord (alleen linkerhand) heeft geen losse .step: de stokrichting en
+// -lengte gaan dan uit van de toonhoogte die het verst van de middenlijn af
+// staat, net als in drawNote.
+function farStepOf(n, middleLineStep) {
+  if (!n.chord) return n.step;
+  const steps = n.pitches.map(p => p.step);
+  const minStep = Math.min(...steps), maxStep = Math.max(...steps);
+  return Math.abs(maxStep - middleLineStep) >= Math.abs(minStep - middleLineStep) ? maxStep : minStep;
+}
+// Het stokuiteinde van een akkoord ligt voorbij de buitenste toonhoogte in de
+// (al bepaalde) stokrichting; bij een losse noot is dat gewoon zijn eigen step.
+function stemTipStepOf(n, stemUp) {
+  if (!n.chord) return n.step;
+  const steps = n.pitches.map(p => p.step);
+  return stemUp ? Math.max(...steps) : Math.min(...steps);
+}
+
+function computeBeamGroups(arr, middleLineStep) {
+  const groups = [];
+  let i = 0;
+  while (i < arr.length) {
+    const n = arr[i];
+    if (n.rest || n.dur !== 0.5) { i++; continue; }
+    const beat = Math.floor(n.start + 0.001);
+    let j = i + 1;
+    while (
+      j < arr.length &&
+      !arr[j].rest && arr[j].dur === 0.5 &&
+      Math.floor(arr[j].start + 0.001) === beat
+    ) j++;
+    if (j - i >= 2) {
+      const indices = [];
+      for (let k = i; k < j; k++) indices.push(k);
+      const avgStep = indices.reduce((s, k) => s + farStepOf(arr[k], middleLineStep), 0) / indices.length;
+      groups.push({ indices, stemUp: avgStep <= middleLineStep });
+    }
+    i = j;
+  }
+  return groups;
+}
+
+// Bouwt per balkgroep de balklijn (van de stok van de eerste tot de stok van de
+// laatste noot) en voor elke noot in de groep het punt op die lijn waar zijn
+// eigen stok naartoe loopt (zodat de balk recht is, ook als de noten niet
+// allemaal op dezelfde hoogte staan, net als bij echte notenbalken).
+function buildBeamLookup(groups, px, yOfFn, arr) {
+  const perNote = new Map();
+  const stemLen = 44 * STAFF_SCALE;
+  groups.forEach(g => {
+    const first = g.indices[0], last = g.indices[g.indices.length - 1];
+    const x0 = px(arr[first], first), x1 = px(arr[last], last);
+    const y0 = yOfFn(stemTipStepOf(arr[first], g.stemUp)) + (g.stemUp ? -stemLen : stemLen);
+    const y1 = yOfFn(stemTipStepOf(arr[last], g.stemUp)) + (g.stemUp ? -stemLen : stemLen);
+    g.indices.forEach(k => {
+      const x = px(arr[k], k);
+      const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
+      perNote.set(k, { stemUp: g.stemUp, stemEndY: y0 + (y1 - y0) * t });
+    });
+    g.beamLine = { x0, y0, x1, y1 };
+  });
+  return perNote;
+}
+
 // Tekent een notenbalk (of grote notenbalk met baspartij erbij) in svgEl.
 // Gedeeld door de echte oefenbalk en het voorbeeldbalkje in "Lied toevoegen".
 // activeIdx: index van de noot die nu gespeeld/beoordeeld wordt in rightNotes,
@@ -1238,7 +1416,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // (op of boven de middenlijn: stok omlaag, eronder: stok omhoog).
   // accState: { measure, shown } bijgehouden per hand, voor voortekens die maar
   // eenmaal per maat getoond worden, met een herstelteken als dat nodig is.
-  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState }) {
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState, beamMap }) {
     const x = px(n, i);
 
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
@@ -1265,9 +1443,11 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     const hollow = dur >= 2;
     const hasStem = dur < 4; // een hele noot heeft geen stok
     // Stokrichting op basis van de toonhoogte die het verst van de middenlijn af
-    // staat (bij een akkoord), net als in gangbare notenschrift.
+    // staat (bij een akkoord), net als in gangbare notenschrift. Bij een gebalkte
+    // groep geldt voor alle noten in de groep dezelfde, vooraf bepaalde richting.
     const farStep = Math.abs(maxStep - middleLineStep) >= Math.abs(minStep - middleLineStep) ? maxStep : minStep;
-    const stemUp = farStep <= middleLineStep;
+    const beamed = beamMap && beamMap.get(i);
+    const stemUp = beamed ? beamed.stemUp : farStep <= middleLineStep;
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
@@ -1359,10 +1539,10 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       const stemX = stemUp ? x + S(7) : x - S(7);
       const yHigh = yOfFn(maxStep), yLow = yOfFn(minStep); // hogere step = hogere toon = kleinere y
       const stemStartY = stemUp ? yLow : yHigh;
-      const stemEndY = stemUp ? yHigh - S(44) : yLow + S(44);
+      const stemEndY = beamed ? beamed.stemEndY : (stemUp ? yHigh - S(44) : yLow + S(44));
       el('line', { x1:stemX, x2:stemX, y1:stemStartY, y2:stemEndY, stroke:stemColor, opacity: noteOpacity, 'stroke-width':S(1.6) }, svgEl);
-      if (dur < 1) {
-        // Vlaggetje voor een achtste noot, gespiegeld naar gelang de stokrichting.
+      if (dur < 1 && !beamed) {
+        // Vlaggetje voor een losse achtste noot, gespiegeld naar gelang de stokrichting.
         const d = stemUp
           ? `M ${stemX} ${stemEndY} C ${stemX+S(12)} ${stemEndY+S(4)} ${stemX+S(9)} ${stemEndY+S(14)} ${stemX+S(0.5)} ${stemEndY+S(19)}`
           : `M ${stemX} ${stemEndY} C ${stemX-S(12)} ${stemEndY-S(4)} ${stemX-S(9)} ${stemEndY-S(14)} ${stemX-S(0.5)} ${stemEndY-S(19)}`;
@@ -1380,11 +1560,27 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     }
   }
 
+  // Balkgroepen (gebalkte achtste noten): per hand de aaneengesloten achtsten
+  // binnen dezelfde tel opsporen, dan de balklijn tekenen ná de noten/stokken,
+  // zodat de balk er mooi boven- of onderop ligt.
+  function drawBeams(groups) {
+    groups.forEach(g => {
+      const { x0, y0, x1, y1 } = g.beamLine;
+      el('line', { x1:x0, x2:x1, y1:y0, y2:y1, stroke:'#2b2640', 'stroke-width':S(4) }, svgEl);
+    });
+  }
+
   const rightAcc = { measure: -1, shown: {} };
-  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc }));
+  const rightBeamGroups = computeBeamGroups(rightNotes, 34);
+  const rightBeamMap = buildBeamLookup(rightBeamGroups, px, yOf, rightNotes);
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc, beamMap: rightBeamMap }));
+  drawBeams(rightBeamGroups);
   if (hasLeft) {
     const leftAcc = { measure: -1, shown: {} };
-    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc }));
+    const leftBeamGroups = computeBeamGroups(leftNotes, 22);
+    const leftBeamMap = buildBeamLookup(leftBeamGroups, px, yOfBass, leftNotes);
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc, beamMap: leftBeamMap }));
+    drawBeams(leftBeamGroups);
   }
 
   return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
