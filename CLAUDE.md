@@ -27,9 +27,8 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
-  herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
-  los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
-  noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
+  herhaling, en rekening houdend met de voortekening, zie hieronder). Nog niet geïmplementeerd:
+  samengebalkte achtste noten (elke achtste krijgt nu een los vlaggetje).
 - Speel af: een balk loopt over de noten met aftellen (4 tellen).
 - Geluid bij "Speel af": echte pianosamples (Salamander Grand Piano, CC BY 3.0, opnames van
   Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke
@@ -84,6 +83,18 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   akkoord gelijktijdig. "Lied toevoegen" heeft een "+ akkoord"-knop per rij in het
   linkerhandblok, die een extra toonhoogte-kiezer toevoegt (alleen daar, niet bij de
   rechterhand).
+- Toonsoort/voortekening: een lied kan optioneel `key` hebben, een getal volgens dezelfde
+  conventie als MusicXML's `<fifths>` (positief = dat aantal kruizen, negatief dat aantal
+  mollen, 0/weggelaten = geen voortekening, het gedrag van voorheen). De voortekens zelf staan
+  vast tussen de sleutel en de maatsoort, op hun gangbare notenbalkpositie (de kwintencirkel-
+  volgorde F,C,G,D,A,E,B voor kruizen, B,E,A,D,G,C,F voor mollen). Dit verandert alleen welk
+  kruis/mol/herstelteken er getekend wordt (per noot, t.o.v. die voortekening binnen de maat),
+  niet de klinkende toonhoogte: een notenaam in `notes`/`left.notes` is nog steeds altijd de
+  werkelijke toonhoogte, dus `'F4'` klinkt altijd F, ook bij `key: 2` (D-groot, F en C al
+  kruis) - wil je dat een noot de kruis van de toonsoort "volgt", schrijf dan gewoon `'F#4'`
+  zoals voorheen; de app laat dan vanzelf het losse teken weg omdat het al bij de voortekening
+  hoort. "Lied toevoegen" heeft een toonsoort-keuzeveld (0 tot 7 kruizen/mollen) naast
+  "Tellen per maat".
 - Automatisch noten uit een foto/pdf lezen (optical music recognition) doet de app zelf niet: dat
   vraagt een externe beeldherkenningsdienst en dus een server, wat niet past bij één bestand
   zonder build-stap, en de uitkomst op een foto is sowieso niet gegarandeerd correct. In plaats
@@ -119,6 +130,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 4. Spotify-koppeling: liked songs als wensenlijst, met een voortgangsbalk per nummer.
 5. Losse modules splitsen (audio, notenbalk, spelmotor) zodra het groter wordt.
 6. "Lied toevoegen": noten uit een pdf met meerdere bladzijdes.
+7. Dataformat verder uitbreiden (toonsoort/voortekening is al gedaan, zie hierboven): triolen/
+   onregelmatige maatverdeling, akkoorden ook zichtbaar bij de rechterhand (alleen tekenen/
+   afspelen, niet beoordelen, net als de linkerhand nu), en meerdere stemmen binnen één
+   notenbalk. Los daarvan: voor complexe stukken die de microfoon toch niet betrouwbaar noot
+   voor noot kan beoordelen, een andere scoringsmethode overwegen (bijvoorbeeld: eenvoudige
+   liederen/tonen blijven live beoordeeld, maar bij complexere liederen de hele opname achteraf
+   vergelijken met het origineel voor extra punten). Nog niet uitgewerkt, bewust voor later.
 
 ## Werkafspraken
 - Schrijf teksten in de app in het Nederlands.

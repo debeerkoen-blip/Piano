@@ -540,6 +540,25 @@
         <label>Titel <input type="text" id="newTitle" placeholder="Titel van het lied"></label>
         <label>Tempo (bpm) <input type="number" id="newBpm" value="100" min="30" max="240"></label>
         <label>Tellen per maat <input type="number" id="newBeats" value="4" min="1" max="12"></label>
+        <label>Toonsoort (voortekening)
+          <select id="newKey">
+            <option value="0" selected>Geen voortekening (C)</option>
+            <option value="1">1 kruis (G)</option>
+            <option value="2">2 kruizen (D)</option>
+            <option value="3">3 kruizen (A)</option>
+            <option value="4">4 kruizen (E)</option>
+            <option value="5">5 kruizen (B)</option>
+            <option value="6">6 kruizen (F#)</option>
+            <option value="7">7 kruizen (C#)</option>
+            <option value="-1">1 mol (F)</option>
+            <option value="-2">2 mollen (Bb)</option>
+            <option value="-3">3 mollen (Eb)</option>
+            <option value="-4">4 mollen (Ab)</option>
+            <option value="-5">5 mollen (Db)</option>
+            <option value="-6">6 mollen (Gb)</option>
+            <option value="-7">7 mollen (Cb)</option>
+          </select>
+        </label>
       </div>
 
       <div class="controlGroup">
@@ -583,6 +602,11 @@
 // Alleen de linkerhand (left.notes) ondersteunt dit: die wordt getekend en klinkt mee bij
 // "Speel af", maar wordt (net als de rest van de linkerhand) niet door de microfoon
 // beoordeeld, die maar één toon tegelijk herkent. De rechterhand blijft daarom één toon per tel.
+// key: optioneel, de voortekening als "fifths" (MusicXML-conventie): positief = dat aantal
+// kruizen, negatief = dat aantal mollen, 0 of weggelaten = geen voortekening (huidig gedrag).
+// Verandert alleen welk kruis/mol/herstelteken er getekend wordt (aan het begin van de balk,
+// en per noot t.o.v. die voortekening); de klinkende toonhoogte komt nog steeds alleen uit de
+// notenaam zelf, dus 'F4' klinkt altijd F, ook bij key: 2 (F#/C#). Zie keyAccidentalFor.
 // beatsPerMeasure: aantal tellen per maat, voor de maatstrepen in de notenbalk.
 // draft: true betekent dat de noten, vingerzetting en maatindeling nog niet zijn gecontroleerd.
 const SONGS = [
@@ -825,6 +849,31 @@ function midiToLabel(m) {
   return NAME_PC[m % 12] + (Math.floor(m / 12) - 1);
 }
 
+// ---------- Toonsoort/voortekening ----------
+// song.key (of de gekozen fifths bij "Lied toevoegen") volgt dezelfde conventie als
+// MusicXML's <fifths>: een positief getal is dat aantal kruizen, negatief dat aantal mollen,
+// 0 of ontbrekend is geen voortekening (huidig gedrag, C-groot/a-klein). Dit bepaalt alleen
+// welk voorteken er aan het begin van de balk en per noot getekend wordt, niet de klinkende
+// toonhoogte: een noot in `notes` is altijd de werkelijke toonhoogte, net als nu ('F4' klinkt
+// altijd F, ook in een toonsoort met een kruis op F; wil je dat F# laten klinken, schrijf dan
+// 'F#4', zoals voorheen).
+const SHARP_ORDER = ['F','C','G','D','A','E','B'];
+const FLAT_ORDER  = ['B','E','A','D','G','C','F'];
+function keyAccidentalFor(letter, fifths) {
+  if (!fifths) return '';
+  if (fifths > 0) return SHARP_ORDER.slice(0, fifths).includes(letter) ? '#' : '';
+  return FLAT_ORDER.slice(0, -fifths).includes(letter) ? 'b' : '';
+}
+// Vaste notenbalkposities (dezelfde "step"-eenheid als parseNote) van de voortekens, in de
+// volgorde hierboven, voor de vioolsleutel: F5,C5,G5,D5,A4,E5,B4 (kruizen) resp. B4,E5,A4,D5,
+// G4,C5,F4 (mollen) - de gangbare zigzag uit het notenschrift. De bassleutel ligt daar precies
+// een octaaf (7 steps) onder.
+const TREBLE_SHARP_STEPS = [38, 35, 39, 36, 33, 37, 34];
+const TREBLE_FLAT_STEPS  = [34, 37, 33, 36, 32, 35, 31];
+function keySigWidth(fifths) {
+  return fifths ? Math.abs(fifths) * 9 + 8 : 0; // extra ruimte vóór de maatsoort, ongeschaald (zie STAFF_SCALE)
+}
+
 // ---------- Staf tekenen ----------
 const svgNS = 'http://www.w3.org/2000/svg';
 const staff = document.getElementById('staff');
@@ -844,19 +893,23 @@ const STAFF_X0 = 110 * STAFF_SCALE;     // linkermarge vóór de eerste noot
 const NOTE_SPACING = 34 * STAFF_SCALE;  // afstand tussen twee noten/tellen
 const yOf = step => (170 - (step - 30) * 10) * STAFF_SCALE; // E4 zit op de onderste lijn
 const yOfBass = step => (330 - (step - 18) * 10) * STAFF_SCALE; // G2 zit op de onderste lijn
-const xOf = i => STAFF_X0 + i * NOTE_SPACING;
+// Begin-x van de eerste noot voor het huidige lied: STAFF_X0 plus extra ruimte als het lied
+// een voortekening heeft (bijgewerkt door loadSong, zie keySigWidth). Zonder voortekening
+// (het gangbare geval) is dit gewoon STAFF_X0, ongewijzigd t.o.v. voorheen.
+let noteStartX = STAFF_X0;
+const xOf = i => noteStartX + i * NOTE_SPACING;
 
 // X-positie van een noot. Bij een lied zonder linkerhand staan de noten gewoon
 // even ver uit elkaar op volgorde (xOf). Heeft een lied wel een linkerhand, dan
 // moeten beide handen op dezelfde tel verticaal uitgelijnd staan, dus dan telt
 // de echte teltijd (note.start) in plaats van de positie in de rij.
 function noteX(note, i) {
-  return song.left ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
+  return song.left ? (noteStartX + note.start * NOTE_SPACING) : xOf(i);
 }
 
 // X-positie van de speelstreep op tijdstip t (in tellen).
 function xAtTime(t) {
-  if (song.left) return STAFF_X0 + Math.max(0, t) * NOTE_SPACING;
+  if (song.left) return noteStartX + Math.max(0, t) * NOTE_SPACING;
   if (!notes.length) return xOf(0);
   let i = 0;
   while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
@@ -869,9 +922,9 @@ function xAtTime(t) {
 // Omgekeerde van xAtTime/noteX: de teltijd die bij een x-positie hoort. Gebruikt
 // om te bepalen waar de speler naartoe heeft gescrold tijdens Speel af.
 function timeAtX(x) {
-  if (song.left) return Math.max(0, (x - STAFF_X0) / NOTE_SPACING);
+  if (song.left) return Math.max(0, (x - noteStartX) / NOTE_SPACING);
   if (!notes.length) return 0;
-  const i = Math.round((x - STAFF_X0) / NOTE_SPACING);
+  const i = Math.round((x - noteStartX) / NOTE_SPACING);
   const clamped = Math.max(0, Math.min(notes.length - 1, i));
   return notes[clamped].start;
 }
@@ -923,6 +976,7 @@ function loadSong(s) {
   stopPlay(false);
   resetNoteDetection();
   song = s;
+  noteStartX = STAFF_X0 + keySigWidth(s.key || 0) * STAFF_SCALE;
   beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
@@ -967,8 +1021,8 @@ const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 
 // Gedeeld door de echte oefenbalk en het voorbeeldbalkje in "Lied toevoegen".
 // activeIdx: index van de noot die nu gespeeld/beoordeeld wordt in rightNotes,
 // of null voor een pure voorbeeldweergave (beide handen gewoon goed zichtbaar,
-// niets gemarkeerd of gedimd).
-function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx) {
+// niets gemarkeerd of gedimd). fifths: voortekening, zie keyAccidentalFor hierboven.
+function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx, fifths = 0) {
   svgEl.innerHTML = '';
   const previewMode = activeIdx === null;
   const hasLeft = leftNotes && leftNotes.length > 0;
@@ -985,14 +1039,19 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     lastRight ? lastRight.start + lastRight.dur : 0,
     lastLeft ? lastLeft.start + lastLeft.dur : 0
   );
+  // Begin-x van de eerste noot: STAFF_X0 plus extra ruimte voor de voortekening (0 zonder
+  // voortekening, dan ongewijzigd t.o.v. voorheen). Los van de globale noteStartX/xOf, zodat
+  // het voorbeeldbalkje in "Lied toevoegen" dit onafhankelijk van het geladen lied kan tonen.
+  const pxBase = STAFF_X0 + S(keySigWidth(fifths));
+  const localXOf = i => pxBase + i * NOTE_SPACING;
   // Zonder linkerhand staan de noten gewoon op volgorde even ver uit elkaar
-  // (xOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
+  // (localXOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
   // uitgelijnd staan, dus dan telt de echte teltijd (note.start) voor de
   // x-positie, bij beide handen.
-  const px = (note, i) => hasLeft ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
+  const px = (note, i) => hasLeft ? (pxBase + note.start * NOTE_SPACING) : localXOf(i);
   const svgWidth = hasLeft
-    ? Math.max(S(600), STAFF_X0 + lastEndBeat * NOTE_SPACING + S(60))
-    : Math.max(S(600), xOf(Math.max(rightNotes.length - 1, 0)) + S(60));
+    ? Math.max(S(600), pxBase + lastEndBeat * NOTE_SPACING + S(60))
+    : Math.max(S(600), localXOf(Math.max(rightNotes.length - 1, 0)) + S(60));
   svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
   svgEl.style.minWidth = svgWidth + 'px';
 
@@ -1006,16 +1065,35 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     bassClef.textContent = '\u{1D122}';
   }
 
+  // Voortekening: de kruizen/mollen van de toonsoort, vast tussen de sleutel en de
+  // maatsoort in, op hun gangbare notenbalkpositie (zie TREBLE_SHARP/FLAT_STEPS). Alleen
+  // getekend als fifths !== 0; anders precies zoals voorheen (geen extra ruimte, geen tekens).
+  function drawKeySignature(yOfFn, isBass) {
+    if (!fifths) return;
+    const letters = fifths > 0 ? SHARP_ORDER.slice(0, fifths) : FLAT_ORDER.slice(0, -fifths);
+    const steps = fifths > 0 ? TREBLE_SHARP_STEPS : TREBLE_FLAT_STEPS;
+    const shift = isBass ? -7 : 0;
+    letters.forEach((letter, i) => {
+      const y = yOfFn(steps[i] + shift);
+      const sign = el('text', { x: S(55) + S(i * 9), y: y + S(5), 'font-size':S(17), 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+      sign.textContent = fifths > 0 ? '♯' : '♭';
+    });
+  }
+  drawKeySignature(yOf, false);
+  if (hasLeft) drawKeySignature(yOfBass, true);
+
   // Maatsoort: altijd een /4-maatsoort in dit datamodel (dur:1 = kwartnoot),
-  // teller is het aantal tellen per maat. Op elke notenbalk van het stuk.
+  // teller is het aantal tellen per maat. Op elke notenbalk van het stuk. De x-positie
+  // schuift mee met pxBase, zodat hij na een bredere voortekening blijft kloppen.
+  const timeSigX = pxBase - S(28);
   function timeSignature(cx, topY, bottomY) {
     const num = el('text', { x:cx, y:topY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     num.textContent = String(beatsPerMeasure);
     const den = el('text', { x:cx, y:bottomY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     den.textContent = '4';
   }
-  timeSignature(S(82), S(118), S(158));
-  if (hasLeft) timeSignature(S(82), S(278), S(318));
+  timeSignature(timeSigX, S(118), S(158));
+  if (hasLeft) timeSignature(timeSigX, S(278), S(318));
 
   let playhead = null;
   if (!previewMode) {
@@ -1106,13 +1184,17 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     const uniqueSteps = [...new Set(steps)].sort((a, b) => a - b);
     uniqueSteps.forEach(s => ledgerLines(x, s, yOfFn, bottomLineStep, topLineStep));
 
-    // Voorteken per toonhoogte: alleen tonen als het verschilt van wat er dit al
-    // in deze maat voor deze toonhoogte getoond is. Een eerder kruis of mol dat
-    // weer naar onveranderd moet, krijgt een herstelteken.
+    // Voorteken per toonhoogte: alleen tonen als het verschilt van wat er dit al in deze
+    // maat voor deze toonhoogte getoond is. Zonder eerder teken in de maat geldt niet "niks"
+    // als uitgangspunt, maar wat de voortekening (fifths) voor deze lettertoon standaard al
+    // voorschrijft; wijkt de noot daarvan af (of keert hij terug), dan is dat teken nodig
+    // (inclusief een herstelteken). Zonder voortekening (fifths 0) is keyDefault altijd '',
+    // identiek aan het gedrag van voorheen.
     pitches.forEach(p => {
       const wanted = p.accidental || '';
-      const prevShown = accState.shown[p.step];
-      const needsSign = prevShown === undefined ? wanted !== '' : prevShown !== wanted;
+      const keyDefault = keyAccidentalFor(p.letter, fifths);
+      const prevShown = accState.shown[p.step] !== undefined ? accState.shown[p.step] : keyDefault;
+      const needsSign = prevShown !== wanted;
       if (needsSign) {
         const y = yOfFn(p.step);
         const signFill = p.letter === 'C' ? '#ec8f4c' : '#2b2640';
@@ -1185,7 +1267,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
 }
 
 function render() {
-  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx);
+  const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx, song.key || 0);
   phRect = playhead;
 
   // Los van de SVG (die zijwaarts kan scrollen) zodat deze tekst altijd
@@ -2246,6 +2328,7 @@ function wireRowButtons(containerId, addBtnId, restBtnId, handPrefix) {
 wireRowButtons('noteRows', 'addNoteBtn', 'addRestBtn', 'R');
 wireRowButtons('noteRowsLeft', 'addNoteBtnLeft', 'addRestBtnLeft', 'L');
 document.getElementById('newBeats').addEventListener('change', renderPreview);
+document.getElementById('newKey').addEventListener('change', renderPreview);
 
 function readNoteRows(containerId) {
   const rows = [...document.querySelectorAll(`#${containerId} .noteRow`)];
@@ -2281,9 +2364,10 @@ function renderPreview() {
   if (!right.notes.length && !left.notes.length) { svgEl.innerHTML = ''; return; }
 
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  const fifths = parseInt(document.getElementById('newKey').value, 10) || 0;
   // Dezelfde omzetting als bij een opgeslagen lied (parseHand), zodat het
-  // voorbeeldbalkje akkoorden precies zo tekent als de echte oefenbalk dat zou doen.
-  drawGrandStaff(svgEl, parseHand(right), parseHand(left), beatsPerMeasure, null);
+  // voorbeeldbalkje akkoorden en voortekening precies zo tekent als de echte oefenbalk dat zou doen.
+  drawGrandStaff(svgEl, parseHand(right), parseHand(left), beatsPerMeasure, null, fifths);
 }
 
 document.getElementById('saveSongBtn').addEventListener('click', () => {
@@ -2291,6 +2375,7 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   const title = document.getElementById('newTitle').value.trim();
   const bpm = parseFloat(document.getElementById('newBpm').value) || 100;
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  const key = parseInt(document.getElementById('newKey').value, 10) || 0;
   const right = readNoteRows('noteRows');
   const left = readNoteRows('noteRowsLeft');
 
@@ -2311,6 +2396,7 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
     draft: true, custom: true,
     notes: right.notes, durations: right.durations, fingers: right.fingers
   };
+  if (key) newSong.key = key;
   if (left.notes.length) {
     newSong.left = { notes: left.notes, durations: left.durations, fingers: left.fingers };
   }
