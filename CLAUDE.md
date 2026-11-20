@@ -8,6 +8,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+- Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
+  bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
+  en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
+  herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
+  los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
+  noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
 - Speel af: een balk loopt over de noten met aftellen (4 tellen).
 - Oefenmodus: alleen toonhoogte, zonder tijd.
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
