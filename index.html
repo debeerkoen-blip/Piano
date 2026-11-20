@@ -47,8 +47,36 @@
   .sub { color:var(--muted); margin:0; font-size:14px; max-width:65ch; }
 
   /* ---------- Titel ---------- */
-  .topBar { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-4); }
-  h1 { font-size:22px; font-weight:600; margin:0; line-height:1.25; }
+  /* De badge staat los (absoluut) rechts, zodat die de titel niet uit het
+     midden duwt, of die badge er nu wel of niet is. */
+  .topBar { position:relative; display:flex; align-items:center; justify-content:center; margin-bottom:var(--space-4); min-height:44px; }
+  .topBar > .icon-btn-wrap { position:absolute; right:0; top:50%; transform:translateY(-50%); }
+  .topBarTitle { margin:0; max-width:100%; }
+  .titleBtn {
+    display:inline-flex; align-items:center; gap:var(--space-1); max-width:100%;
+    font:inherit; font-size:22px; font-weight:600; line-height:1.25; color:var(--ink);
+    background:none; border:0; border-radius:var(--radius-m); padding:var(--space-2) var(--space-3);
+    cursor:pointer;
+  }
+  .titleBtn:hover, .titleBtn:focus-visible { background:var(--lavender); }
+  .titleBtn span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .titleBtn .titleChevron { flex-shrink:0; opacity:.6; }
+
+  /* ---------- Liedjeslijst (paneel achter de titel) ---------- */
+  .songList { display:flex; flex-direction:column; gap:var(--space-2); }
+  .songItem {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    width:100%; min-height:44px; text-align:left; font:inherit; font-size:15px; color:var(--ink);
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+    padding:var(--space-3) var(--space-4); cursor:pointer;
+  }
+  .songItem:hover, .songItem:focus-visible { background:var(--lavender); border-color:transparent; }
+  .songItem.isActive { background:var(--accent-ring); border-color:transparent; color:#fff; }
+  .songItem .draftTag {
+    flex-shrink:0; font-size:11px; font-weight:600; padding:2px 8px;
+    border-radius:var(--radius-pill); background:#fff3d6; color:#7a5300;
+  }
+  .songItem.isActive .draftTag { background:rgba(255,255,255,.3); color:#fff; }
 
   /* ---------- Statistieken (scores) ---------- */
   .stats { display:flex; gap:var(--space-3); margin-bottom:var(--space-6); flex-wrap:wrap; }
@@ -257,7 +285,12 @@
 <body>
 <main>
   <div class="topBar">
-    <h1 id="title">Speel het volgende</h1>
+    <h1 class="topBarTitle">
+      <button type="button" class="titleBtn" id="titleBtn" aria-haspopup="true" aria-controls="songPanel" aria-expanded="false">
+        <span id="title">Speel het volgende</span>
+        <svg class="titleChevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </h1>
     <span class="icon-btn-wrap">
       <button type="button" class="icon-btn warnBtn" id="draftBadge" hidden aria-describedby="tip-draft" aria-label="Concept: nog niet gecontroleerd tegen de partituur">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.6 18a1.8 1.8 0 0 0 1.6 2.7h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 16.5h.01"/></svg>
@@ -325,6 +358,18 @@
 </main>
 
 <div class="panelBackdrop" id="panelBackdrop" hidden></div>
+
+<aside class="panel" id="songPanel" hidden aria-label="Kies een lied">
+  <div class="panelHead">
+    <h2>Kies een lied</h2>
+    <button type="button" class="icon-btn btn-ghost" id="songPanelClose" aria-label="Sluiten">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="panelBody">
+    <div class="songList" id="songList"></div>
+  </div>
+</aside>
 
 <aside class="panel" id="settingsPanel" hidden aria-label="Instellingen">
   <div class="panelHead">
@@ -659,6 +704,7 @@ function loadSong(s) {
   setFeedback('Speel de eerste noot, of druk op Speel af.', '');
   render();
   updateStats();
+  renderSongList();
 }
 
 // Een rust vraagt geen input: sla 'm meteen over zodra idx hem bereikt.
@@ -1517,6 +1563,7 @@ function renderCustomList() {
       saveCustomSongs(customSongs);
       const wasSelected = song.id === s.id;
       populateSongSelect();
+      renderSongList();
       if (wasSelected) {
         songSelect.value = SONGS[0].id;
         loadSong(SONGS[0]);
@@ -1781,10 +1828,12 @@ function wirePanelToggle(triggerId, panelId) {
 wirePanelToggle('settingsToggle', 'settingsPanel');
 wirePanelToggle('searchToggle', 'searchPanel');
 wirePanelToggle('addToggle', 'addSongPanel');
+wirePanelToggle('titleBtn', 'songPanel');
 
 document.getElementById('settingsClose').addEventListener('click', closeAllPanels);
 document.getElementById('searchClose').addEventListener('click', closeAllPanels);
 document.getElementById('addClose').addEventListener('click', closeAllPanels);
+document.getElementById('songPanelClose').addEventListener('click', closeAllPanels);
 panelBackdrop.addEventListener('click', closeAllPanels);
 document.getElementById('draftBadge').addEventListener('click', () => {
   openPanel('settingsPanel', document.getElementById('settingsToggle'));
@@ -1807,6 +1856,34 @@ function populateSongSelect() {
 populateSongSelect();
 songSelect.value = song.id;
 songSelect.addEventListener('change', () => loadSong(findSong(songSelect.value)));
+
+// Liedjeslijst achter de titel: zelfde liedjes als de select in Instellingen,
+// maar als een klikbare lijst in plaats van een dropdown.
+function renderSongList() {
+  const list = document.getElementById('songList');
+  if (!list) return;
+  list.innerHTML = '';
+  allSongs().forEach(s => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'songItem' + (s.id === song.id ? ' isActive' : '');
+    const label = document.createElement('span');
+    label.textContent = s.custom ? s.title + ' (zelf gemaakt)' : s.title;
+    item.appendChild(label);
+    if (s.draft) {
+      const tag = document.createElement('span');
+      tag.className = 'draftTag';
+      tag.textContent = 'concept';
+      item.appendChild(tag);
+    }
+    item.addEventListener('click', () => {
+      loadSong(s);
+      closeAllPanels();
+    });
+    list.appendChild(item);
+  });
+}
+renderSongList();
 
 document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
