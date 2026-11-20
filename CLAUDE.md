@@ -43,7 +43,11 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   stopt na haar eigen tel-duur met een korte fade (demper), niet pas als de hele opname is
   uitgeklonken. `ensureAudioCtx()` maakt de audioCtx + laadt de samples (idempotent: een tweede
   aanroep hergebruikt de bestaande, in plaats van 'm te vervangen); zowel de microfoon als het
-  aantikken van een losse noot gebruiken die ene functie. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
+  aantikken van een losse noot gebruiken die ene functie. Geluid wordt gepland via `audioNow()`
+  in plaats van rechtstreeks `audioCtx.currentTime`: die laatste is het moment waarop een
+  geluid de audio-pijplijn ingaat, niet waarop het uit de speaker komt (`outputLatency`/
+  `baseLatency`, soms tientallen ms). Zonder die correctie klonk elke noot steeds een beetje
+  ná de rode speelstreep en de notenanimatie, die wel exact in real time lopen. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
   de oudere synthetische pianoklank (oscillators met boventonen, inharmoniciteit en een
   hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina. Naast
   "Speel af" staat een los icoontje dat altijd met pianogeluid afspeelt, ook als "Met geluid"

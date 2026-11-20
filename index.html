@@ -1510,6 +1510,17 @@ function scheduleNoteSound(midi, when, duration) {
   }
 }
 
+// AudioContext.currentTime is het moment waarop een geluid de audio-pijplijn ingaat,
+// niet het moment waarop het echt uit de speaker komt: daar zit altijd nog
+// hardware-/driverlatency tussen (outputLatency, soms tientallen ms, op sommige
+// apparaten meer). Zonder correctie klinkt elke geplande noot dus altijd een beetje
+// na de rode speelstreep/animatie, die wel exact in real time lopen. Door audioStart
+// met die latency te verlagen, komt het geluid eerder uit de pijplijn en dus precies
+// op het juiste moment uit de speaker.
+function audioNow() {
+  return audioCtx.currentTime - (audioCtx.outputLatency || audioCtx.baseLatency || 0);
+}
+
 // Plant de metronoomtikken van het lied (niet het aftellen) vanaf fromBeat, zodat zowel
 // een gewone start (fromBeat 0) als verdergaan na een scroll-sprong (fromBeat = waar je
 // naartoe scrolde) dezelfde planning gebruiken.
@@ -1614,7 +1625,7 @@ function startPlay(forceSound = false) {
 
   if (audioCtx) {
     const beatSec = beatMs / 1000;
-    const audioStart = audioCtx.currentTime;
+    const audioStart = audioNow();
 
     if (metronomeOn) {
       for (let c = 0; c < COUNT_IN; c++) {
@@ -1662,7 +1673,7 @@ function seekTo(targetT) {
 
   if (audioCtx) {
     const beatSec = beatMs / 1000;
-    const audioStart = audioCtx.currentTime;
+    const audioStart = audioNow();
     if (metronomeOn) scheduleMetronomeFromBeat(targetT, audioStart, beatSec);
     if (currentPlayHasSound) scheduleNotesFromBeat(targetT, audioStart, beatSec);
   }
