@@ -18,9 +18,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
-  herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
-  los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
-  noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
+  herhaling). Achtste noten die binnen dezelfde tel op elkaar volgen krijgen een gezamenlijke balk
+  (`computeBeamGroups`/`buildBeamLookup`) in plaats van elk een los vlaggetje; een achtste die
+  alleen in zijn tel staat (bijvoorbeeld na een gestippelde noot, of onderbroken door een rust)
+  krijgt nog gewoon een vlaggetje. Nog niet geïmplementeerd: een echte toonsoort/voortekening
+  (elke verhoging/verlaging staat los bij de noot, er is geen mol- of kruisvoortekening aan het
+  begin van de balk).
 - Speel af: een balk loopt over de noten met aftellen (4 tellen).
 - Geluid bij "Speel af": echte pianosamples (Salamander Grand Piano, CC BY 3.0, opnames van
   Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke

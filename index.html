@@ -765,6 +765,56 @@ function updateStats() {
 // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
 const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
 
+// Groepeert aaneengesloten achtste noten binnen dezelfde tel tot één balkgroep,
+// in plaats van dat elke achtste noot een los vlaggetje krijgt (gangbare notatie
+// bij een /4-maatsoort: er wordt per tel gebalkt). Een rust, een andere
+// nootwaarde, of de grens van de tel breekt een groep af. Een groep van 1
+// (geïsoleerde achtste) krijgt nog gewoon een vlaggetje, zoals voorheen.
+function computeBeamGroups(arr, middleLineStep) {
+  const groups = [];
+  let i = 0;
+  while (i < arr.length) {
+    const n = arr[i];
+    if (n.rest || n.dur !== 0.5) { i++; continue; }
+    const beat = Math.floor(n.start + 0.001);
+    let j = i + 1;
+    while (
+      j < arr.length &&
+      !arr[j].rest && arr[j].dur === 0.5 &&
+      Math.floor(arr[j].start + 0.001) === beat
+    ) j++;
+    if (j - i >= 2) {
+      const indices = [];
+      for (let k = i; k < j; k++) indices.push(k);
+      const avgStep = indices.reduce((s, k) => s + arr[k].step, 0) / indices.length;
+      groups.push({ indices, stemUp: avgStep <= middleLineStep });
+    }
+    i = j;
+  }
+  return groups;
+}
+
+// Bouwt per balkgroep de balklijn (van de stok van de eerste tot de stok van de
+// laatste noot) en voor elke noot in de groep het punt op die lijn waar zijn
+// eigen stok naartoe loopt (zodat de balk recht is, ook als de noten niet
+// allemaal op dezelfde hoogte staan, net als bij echte notenbalken).
+function buildBeamLookup(groups, px, yOfFn, arr) {
+  const perNote = new Map();
+  groups.forEach(g => {
+    const first = g.indices[0], last = g.indices[g.indices.length - 1];
+    const x0 = px(arr[first], first), x1 = px(arr[last], last);
+    const y0 = yOfFn(arr[first].step) + (g.stemUp ? -44 : 44);
+    const y1 = yOfFn(arr[last].step) + (g.stemUp ? -44 : 44);
+    g.indices.forEach(k => {
+      const x = px(arr[k], k);
+      const t = x1 === x0 ? 0 : (x - x0) / (x1 - x0);
+      perNote.set(k, { stemUp: g.stemUp, stemEndY: y0 + (y1 - y0) * t });
+    });
+    g.beamLine = { x0, y0, x1, y1 };
+  });
+  return perNote;
+}
+
 // Tekent een notenbalk (of grote notenbalk met baspartij erbij) in svgEl.
 // Gedeeld door de echte oefenbalk en het voorbeeldbalkje in "Lied toevoegen".
 // activeIdx: index van de noot die nu gespeeld/beoordeeld wordt in rightNotes,
@@ -859,7 +909,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // (op of boven de middenlijn: stok omlaag, eronder: stok omhoog).
   // accState: { measure, shown } bijgehouden per hand, voor voortekens die maar
   // eenmaal per maat getoond worden, met een herstelteken als dat nodig is.
-  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState }) {
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState, beamMap }) {
     const x = px(n, i);
 
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
@@ -881,7 +931,8 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     const dur = n.dur || 1;
     const hollow = dur >= 2;
     const hasStem = dur < 4; // een hele noot heeft geen stok
-    const stemUp = n.step <= middleLineStep;
+    const beamed = beamMap && beamMap.get(i);
+    const stemUp = beamed ? beamed.stemUp : n.step <= middleLineStep;
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
@@ -920,10 +971,10 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       // Op of boven de middenlijn: stok omlaag aan de linkerkant van de bol.
       // Eronder: stok omhoog aan de rechterkant, zoals in gangbare notatie.
       const stemX = stemUp ? x + 7 : x - 7;
-      const stemEndY = stemUp ? y - 44 : y + 44;
+      const stemEndY = beamed ? beamed.stemEndY : (stemUp ? y - 44 : y + 44);
       el('line', { x1:stemX, x2:stemX, y1:y, y2:stemEndY, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
-      if (dur < 1) {
-        // Vlaggetje voor een achtste noot, gespiegeld naar gelang de stokrichting.
+      if (dur < 1 && !beamed) {
+        // Vlaggetje voor een losse achtste noot, gespiegeld naar gelang de stokrichting.
         const d = stemUp
           ? `M ${stemX} ${stemEndY} C ${stemX+12} ${stemEndY+4} ${stemX+9} ${stemEndY+14} ${stemX+0.5} ${stemEndY+19}`
           : `M ${stemX} ${stemEndY} C ${stemX-12} ${stemEndY-4} ${stemX-9} ${stemEndY-14} ${stemX-0.5} ${stemEndY-19}`;
@@ -939,11 +990,27 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     finger.textContent = handPrefix + n.finger;
   }
 
+  // Balkgroepen (gebalkte achtste noten): per hand de aaneengesloten achtsten
+  // binnen dezelfde tel opsporen, dan de balklijn tekenen ná de noten/stokken,
+  // zodat de balk er mooi boven- of onderop ligt.
+  function drawBeams(groups) {
+    groups.forEach(g => {
+      const { x0, y0, x1, y1 } = g.beamLine;
+      el('line', { x1:x0, x2:x1, y1:y0, y2:y1, stroke:'#2b2640', 'stroke-width':4 }, svgEl);
+    });
+  }
+
   const rightAcc = { measure: -1, shown: {} };
-  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc }));
+  const rightBeamGroups = computeBeamGroups(rightNotes, 34);
+  const rightBeamMap = buildBeamLookup(rightBeamGroups, px, yOf, rightNotes);
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc, beamMap: rightBeamMap }));
+  drawBeams(rightBeamGroups);
   if (hasLeft) {
     const leftAcc = { measure: -1, shown: {} };
-    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc }));
+    const leftBeamGroups = computeBeamGroups(leftNotes, 22);
+    const leftBeamMap = buildBeamLookup(leftBeamGroups, px, yOfBass, leftNotes);
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc, beamMap: leftBeamMap }));
+    drawBeams(leftBeamGroups);
   }
 
   return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
