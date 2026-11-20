@@ -566,6 +566,17 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     bassClef.textContent = '\u{1D122}';
   }
 
+  // Maatsoort: altijd een /4-maatsoort in dit datamodel (dur:1 = kwartnoot),
+  // teller is het aantal tellen per maat. Op elke notenbalk van het stuk.
+  function timeSignature(cx, topY, bottomY) {
+    const num = el('text', { x:cx, y:topY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    num.textContent = String(beatsPerMeasure);
+    const den = el('text', { x:cx, y:bottomY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    den.textContent = '4';
+  }
+  timeSignature(82, 118, 158);
+  if (hasLeft) timeSignature(82, 278, 318);
+
   let playhead = null;
   if (!previewMode) {
     // Speelstreep eerst tekenen, zodat de noten erboven liggen.
@@ -606,8 +617,18 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // isActiveHand: de hand die beoordeeld wordt (huidige noot gemarkeerd,
   // gespeelde noten groen) tijdens het oefenen; bij een voorbeeldbalkje (geen
   // activeIdx) staan beide handen gewoon duidelijk leesbaar.
-  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, isActiveHand, handPrefix }) {
+  // middleLineStep: de middelste lijn van de notenbalk, bepaalt de stokrichting
+  // (op of boven de middenlijn: stok omlaag, eronder: stok omhoog).
+  // accState: { measure, shown } bijgehouden per hand, voor voortekens die maar
+  // eenmaal per maat getoond worden, met een herstelteken als dat nodig is.
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, middleLineStep, isActiveHand, handPrefix, accState }) {
     const x = px(n, i);
+
+    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
+    if (measureIdx !== accState.measure) {
+      accState.measure = measureIdx;
+      accState.shown = {};
+    }
 
     if (n.rest) {
       const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
@@ -621,6 +642,8 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     const fill = isC ? '#ec8f4c' : '#2b2640';
     const dur = n.dur || 1;
     const hollow = dur >= 2;
+    const hasStem = dur < 4; // een hele noot heeft geen stok
+    const stemUp = n.step <= middleLineStep;
     let noteOpacity = 1, highlight = 'none';
     if (!previewMode) {
       if (isActiveHand) {
@@ -634,10 +657,19 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     }
 
     ledgerLines(x, n.step, yOfFn, bottomLineStep, topLineStep);
-    if (n.accidental === '#' || n.accidental === 'b') {
+
+    // Voorteken: alleen tonen als het verschilt van wat er dit al in deze maat
+    // voor deze toonhoogte getoond is. Een eerder kruis of mol dat weer naar
+    // onveranderd moet, krijgt een herstelteken.
+    const wanted = n.accidental || '';
+    const prevShown = accState.shown[n.step];
+    const needsSign = prevShown === undefined ? wanted !== '' : prevShown !== wanted;
+    if (needsSign) {
       const sign = el('text', { x: x - 13, y: y + 5, 'font-size':17, 'text-anchor':'middle', fill, opacity: noteOpacity }, svgEl);
-      sign.textContent = n.accidental === '#' ? '♯' : '♭';
+      sign.textContent = wanted === '#' ? '♯' : wanted === 'b' ? '♭' : '♮';
     }
+    accState.shown[n.step] = wanted;
+
     el('ellipse', {
       cx:x, cy:y, rx:8, ry:6,
       fill: hollow ? '#fff' : fill,
@@ -645,10 +677,20 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
       'stroke-width': highlight !== 'none' ? 2.5 : 1.8
     }, svgEl);
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
-    if (dur < 1) {
-      // Vlaggetje voor een achtste noot.
-      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity }, svgEl);
+
+    if (hasStem) {
+      // Op of boven de middenlijn: stok omlaag aan de linkerkant van de bol.
+      // Eronder: stok omhoog aan de rechterkant, zoals in gangbare notatie.
+      const stemX = stemUp ? x + 7 : x - 7;
+      const stemEndY = stemUp ? y - 44 : y + 44;
+      el('line', { x1:stemX, x2:stemX, y1:y, y2:stemEndY, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
+      if (dur < 1) {
+        // Vlaggetje voor een achtste noot, gespiegeld naar gelang de stokrichting.
+        const d = stemUp
+          ? `M ${stemX} ${stemEndY} C ${stemX+12} ${stemEndY+4} ${stemX+9} ${stemEndY+14} ${stemX+0.5} ${stemEndY+19}`
+          : `M ${stemX} ${stemEndY} C ${stemX-12} ${stemEndY-4} ${stemX-9} ${stemEndY-14} ${stemX-0.5} ${stemEndY-19}`;
+        el('path', { d, fill, opacity: noteOpacity }, svgEl);
+      }
     }
     if (isDotted(dur)) {
       el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
@@ -659,9 +701,11 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     finger.textContent = handPrefix + n.finger;
   }
 
-  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, isActiveHand: true, handPrefix: 'R' }));
+  const rightAcc = { measure: -1, shown: {} };
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, middleLineStep: 34, isActiveHand: true, handPrefix: 'R', accState: rightAcc }));
   if (hasLeft) {
-    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, isActiveHand: false, handPrefix: 'L' }));
+    const leftAcc = { measure: -1, shown: {} };
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, middleLineStep: 22, isActiveHand: false, handPrefix: 'L', accState: leftAcc }));
   }
 
   return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
