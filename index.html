@@ -88,6 +88,7 @@
   button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   #playBtn { background:var(--mint); }
   .btn-ghost { background:var(--surface); border-color:var(--border); }
+  .btn-icon { background:var(--peach); font-size:18px; padding:0 var(--space-3); }
 
   .pill {
     display:inline-flex; align-items:center; align-self:flex-start; min-height:36px;
@@ -245,6 +246,7 @@
         <span class="groupLabel">Afspelen</span>
         <div class="groupRow">
           <button id="playBtn">Speel af</button>
+          <button id="playSoundBtn" class="btn-icon" title="Speel af met pianogeluid" aria-label="Speel af met pianogeluid">▶🎵</button>
           <button id="restart" class="btn-ghost">Opnieuw</button>
           <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
         </div>
@@ -923,20 +925,29 @@ function scheduleSynthesizedNote(midi, when, duration) {
   scheduleHammerNoise(when, freq);
 }
 
-function startPlay() {
+// Houdt de twee afspeelknoppen (met en zonder geluid geforceerd) in dezelfde
+// visuele toestand: beide zijn tijdens het afspelen de stopknop.
+function setPlayButtonsState(isPlaying) {
+  document.getElementById('playBtn').textContent = isPlaying ? 'Stop' : 'Speel af';
+  const soundBtn = document.getElementById('playSoundBtn');
+  soundBtn.textContent = isPlaying ? '⏹' : '▶🎵';
+  soundBtn.title = soundBtn.ariaLabel = isPlaying ? 'Stop' : 'Speel af met pianogeluid';
+}
+
+function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   playing = true;
   startT = performance.now();
-  document.getElementById('playBtn').textContent = 'Stop';
+  setPlayButtonsState(true);
   document.getElementById('restart').disabled = true;
   setFeedback('Tel mee...', '');
   render();
   updateStats();
 
-  if (document.getElementById('soundToggle').checked && audioCtx) {
+  if ((forceSound || document.getElementById('soundToggle').checked) && audioCtx) {
     const beatSec = beatMs / 1000;
     // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
     // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
@@ -1001,7 +1012,7 @@ function stopPlay(completed) {
   rafId = null;
   const was = playing;
   playing = false;
-  document.getElementById('playBtn').textContent = 'Speel af';
+  setPlayButtonsState(false);
   if (!was) return;
   if (completed) finish();
   else setFeedback('Gestopt.', '');
@@ -1609,6 +1620,12 @@ document.getElementById('playBtn').addEventListener('click', async () => {
   if (playing) { stopPlay(false); return; }
   const ok = await startMic();
   if (ok) startPlay();
+});
+
+document.getElementById('playSoundBtn').addEventListener('click', async () => {
+  if (playing) { stopPlay(false); return; }
+  const ok = await startMic();
+  if (ok) startPlay(true);
 });
 
 document.getElementById('restart').addEventListener('click', () => {
