@@ -322,6 +322,23 @@ function stopPlay(completed) {
 // ---------- Microfoon en toonhoogte ----------
 let audioCtx = null, analyser = null, buf = null, micOn = false, listenTimer = null;
 
+function micErrorText(err) {
+  switch (err.name) {
+    case 'NotAllowedError':
+      return 'Toegang tot de microfoon is geweigerd. Kijk bij de site-instellingen van je browser (slotje of drie puntjes naast het adres) of de microfoon op "Toestaan" staat.';
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'Geen microfoon gevonden op dit apparaat.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'De microfoon is bezet door een andere app. Sluit die en probeer opnieuw.';
+    case 'SecurityError':
+      return 'De browser blokkeert de microfoon omdat deze pagina niet als veilig wordt gezien.';
+    default:
+      return `Geen toegang tot de microfoon (${err.name || 'onbekende fout'}).`;
+  }
+}
+
 async function startMic() {
   if (micOn) return true;
   try {
@@ -340,7 +357,7 @@ async function startMic() {
     listenTimer = setInterval(listen, 60);
     return true;
   } catch (err) {
-    setFeedback('Geen toegang tot de microfoon. Open de pagina via localhost of https en geef toestemming.', 'bad');
+    setFeedback(micErrorText(err), 'bad');
     return false;
   }
 }
