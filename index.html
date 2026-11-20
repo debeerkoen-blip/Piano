@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Best effort tegen een hardnekkig cacheprobleem (vooral mobiele Safari): deze
+     meta-tags worden door browsers voor de echte HTTP-cache meestal genegeerd
+     (die luistert naar de Cache-Control header die GitHub Pages zelf verstuurt,
+     niet aan te passen zonder server), maar kunnen in-memory/bfcache-hergebruik
+     bij terugnavigeren wel helpen voorkomen. Zie CLAUDE.md "Let op": na elke
+     update kan een gewone herlaad alsnog een oude cache tonen, dan helpt alleen
+     een echte harde herlaad of een privénavigatievenster. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Piano prototype</title>
 <style>
   :root {
@@ -162,6 +172,20 @@
   .staffWrap::-webkit-scrollbar { height:8px; }
   .staffWrap::-webkit-scrollbar-track { background:transparent; }
   .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
+  /* Een lied met linkerhand (grote notenbalk, twee regels) is van zichzelf
+     hoger dan een gewone regel. Rechtop (portretstand) is daar normaal gesproken
+     ruim voldoende hoogte voor, maar op een lied met linkerhand plus een iets
+     kleiner scherm (zoals een oudere/kleinere telefoon) kon de kaart daardoor
+     niet meer op één scherm passen. calc(100vh - 400px) is leeg de ruimte die
+     de rest van de kaart (titel, statistieken, werkbalk, toetsenbord,
+     feedbacktekst, marges) nu eenmaal al nodig heeft, zodat wat overblijft
+     precies voor de notenbalk is; clamp() zorgt dat dat nooit absurd klein
+     (minder leesbaar) of absurd groot (op een heel hoog scherm) wordt.
+     Alleen in portretstand: de liggende/brede varianten hieronder hebben al
+     hun eigen (strengere) hoogte, ongeacht of er een linkerhand is. */
+  @media (orientation: portrait) {
+    .staffWrap.hasLeft #staff { width:auto; min-width:0; height: clamp(140px, calc(100vh - 400px), 420px); }
+  }
   /* Alleen de echte notenbalken scrollen/schalen zo breed; icoon-svg's in
      knoppen moeten gewoon hun eigen kleine formaat houden. Klasse in plaats
      van id, want een opgeslagen-liedjeslijst kan meerdere voorbeeldbalkjes
@@ -171,19 +195,23 @@
   .footNote a { color:inherit; }
 
   /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
-     moet spelen. Alle 88 toetsen schalen mee naar de beschikbare breedte, geen
-     scroll/sprong. Alleen genoeg ruimte op een telefoon in liggende stand of
-     een breder scherm (zie media query onderaan), anders passen 88 toetsen
-     niet leesbaar naast elkaar en blijft 'ie verborgen.
-     Vastgezet onderaan het scherm (position:fixed) in plaats van gewoon
-     ergens midden in de meescrollende kaart: op een telefoon in liggende
-     stand is de kaart vaak hoger dan het scherm, dus zonder dit zou je tijdens
-     het spelen zelf moeten scrollen om 'm te kunnen zien, en leek het net of
-     'ie "bewoog" doordat zijn plek op het scherm niet stabiel was. Vast
-     onderaan betekent: altijd zichtbaar, altijd exact dezelfde plek.
-     main krijgt evenveel extra padding-bottom gereserveerd, anders schuift
-     deze balk over de feedbacktekst/legenda heen. */
-  .keyboardWrap { display:none; }
+     moet spelen, en licht op zodra je de noot speelt. Altijd zichtbaar, ook
+     rechtop op een smalle telefoon: 88 toetsen passen dan niet breed genoeg
+     om goed leesbaar te zijn, maar dat mag best klein uitpakken, beter dan
+     'm helemaal te verbergen. Alle 88 toetsen schalen gewoon mee naar de
+     beschikbare breedte, geen scroll/sprong.
+     Op een telefoon in liggende stand of een breder scherm (zie media query
+     onderaan) staat het toetsenbord bovendien met position:fixed vast
+     onderaan het scherm in plaats van gewoon ergens midden in de
+     meescrollende kaart: op een telefoon in liggende stand is de kaart vaak
+     hoger dan het scherm, dus zonder dit zou je tijdens het spelen zelf
+     moeten scrollen om 'm te kunnen zien, en leek het net of 'ie "bewoog"
+     doordat zijn plek op het scherm niet stabiel was. Rechtop is de kaart
+     juist hoger dan breed, dus daar past het toetsenbord gewoon in de
+     normale doorloop van de kaart, onder de notenbalk.
+     main krijgt in de liggende/brede variant evenveel extra padding-bottom
+     gereserveerd, anders schuift die vaste balk over de feedbacktekst heen. */
+  .keyboardWrap { display:block; margin-top:var(--space-4); }
   #keyboard { display:block; width:100%; height:auto; }
   @media (orientation: landscape), (min-width: 700px) {
     .keyboardWrap {
@@ -333,19 +361,20 @@
      zonder dat je tijdens het spelen moet scrollen. */
   @media (orientation: landscape) and (max-height: 500px) {
     main { padding-top: var(--space-2); padding-bottom: var(--space-4); }
-    .topBar { margin-bottom: var(--space-2); }
-    .titleBtn { font-size: 17px; }
+    .topBar { margin-bottom: var(--space-2); min-height: 34px; }
+    .titleBtn { font-size: 17px; min-height: 0; }
     .stats { margin-bottom: var(--space-2); gap: var(--space-2); }
-    .stat { padding: var(--space-1) var(--space-3); }
+    .stat { padding: 2px var(--space-3); }
     .statIcon { display: none; }
-    .stat b { font-size: 18px; }
+    .stat b { font-size: 18px; line-height: 1; }
+    .statLabel { line-height: 1; }
     .card { padding: var(--space-2) var(--space-3); }
-    .staffToolbar { margin-bottom: var(--space-2); }
-    #staff { width: auto; min-width: 0; height: min(48vh, 250px); }
+    .staffToolbar { margin-bottom: var(--space-1); }
+    #staff { width: auto; min-width: 0; height: min(44vh, 230px); }
     .keyboardWrap { padding: var(--space-1) var(--space-3) max(var(--space-1), env(safe-area-inset-bottom)); }
     #keyboard { height: 48px; }
     main { padding-bottom: 76px; }
-    .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
+    .feedback { margin-top: var(--space-1); min-height: 20px; font-size: 14px; }
   }
 </style>
 </head>
@@ -945,23 +974,29 @@ const KEYBOARD_SVG_WIDTH = KEYBOARD_WHITE_COUNT * KEY_WHITE_W;
 // De linkerhand-noot die "nu" hoort, gekoppeld aan waar de rechterhand (notes[idx])
 // op dit moment is: geen eigen klok nodig, dus werkt ook gewoon in oefenmodus.
 // Een akkoord (alleen linkerhand) licht al z'n toonhoogtes tegelijk op.
-function currentContextMidis() {
+function currentContextMidis(activeIdx) {
   if (!contextNotes.length) return [];
-  const refStart = idx < notes.length ? notes[idx].start : (notes.length ? notes[notes.length - 1].start : null);
+  const refStart = activeIdx < notes.length ? notes[activeIdx].start : (notes.length ? notes[notes.length - 1].start : null);
   if (refStart === null) return [];
   const n = contextNotes.find(cn => !cn.rest && refStart >= cn.start && refStart < cn.start + cn.dur);
   if (!n) return [];
   return n.chord ? n.pitches.map(p => p.midi) : [n.midi];
 }
 
-function renderKeyboard() {
+// activeIdx: dezelfde pointer als de notenbalk gebruikt voor de "huidige noot"
+// (playing ? passedIdx : idx, zie render()). Eerder gebruikte deze functie
+// hier steeds de score-pointer idx zelf, die tijdens Speel af bewust wat
+// coulance heeft (venster/MISS_GRACE_MS): de paarse toets op het klavier liep
+// daardoor niet synchroon met de paarse markering op de notenbalk (die al wel
+// op passedIdx liep). Nu gebruiken beide dezelfde pointer.
+function renderKeyboard(activeIdx) {
   const svgEl = document.getElementById('keyboard');
   svgEl.innerHTML = '';
   svgEl.setAttribute('viewBox', `0 0 ${KEYBOARD_SVG_WIDTH} ${KEY_WHITE_H}`);
 
-  const current = idx < notes.length ? notes[idx] : null;
+  const current = activeIdx < notes.length ? notes[activeIdx] : null;
   const currentMidi = current ? current.midi : null;
-  const contextMidis = currentContextMidis();
+  const contextMidis = currentContextMidis(activeIdx);
   const keyFill = (midi, whiteDefault) => {
     if (midi === currentMidi) return '#8c73e8'; // rechterhand (R), te spelen
     if (contextMidis.includes(midi)) return '#2dd4bf'; // linkerhand, alleen ter context
@@ -1208,8 +1243,22 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // xOf/STAFF_X0/NOTE_SPACING zijn al geschaald; alle andere maten hier (lijndiktes,
   // lettergroottes, marges) lopen via S zodat de hele notenbalk in verhouding blijft.
   const S = v => v * STAFF_SCALE;
-  const svgHeight = S(hasLeft ? 420 : 240);
+  const fullHeight = S(hasLeft ? 420 : 240);
   const staffTop = S(90), staffBottom = S(hasLeft ? 330 : 170);
+
+  // De vaste canvashoogte hierboven (fullHeight) laat standaard evenveel ruimte
+  // vrij boven de notenbalk als voor een paar hulplijntjes boven de g-sleutel
+  // nodig zou zijn, ook als dit lied helemaal geen hoge noten heeft: dan oogt
+  // dat als lege witruimte. Het stuk canvas boven de notenbalk snijden we hier
+  // weg (alleen het zichtbare kader via de viewBox, de tekencoördinaten
+  // hieronder blijven ongewijzigd) tot net genoeg voor de sleutel plus, als
+  // dit specifieke lied toch hogere noten heeft, de hulplijntjes die dat nodig
+  // heeft.
+  const usedRightSteps = rightNotes.flatMap(n => n.rest ? [] : n.chord ? n.pitches.map(p => p.step) : [n.step]);
+  const topLineStep = 38;
+  const highestNoteY = usedRightSteps.length ? yOf(Math.max(...usedRightSteps, topLineStep)) : staffTop;
+  const topCrop = Math.max(0, Math.min(staffTop - S(45), highestNoteY - S(18)));
+  const svgHeight = fullHeight - topCrop;
 
   const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
   const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
@@ -1225,7 +1274,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   const svgWidth = hasLeft
     ? Math.max(S(600), STAFF_X0 + lastEndBeat * NOTE_SPACING + S(60))
     : Math.max(S(600), xOf(Math.max(rightNotes.length - 1, 0)) + S(60));
-  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  svgEl.setAttribute('viewBox', `0 ${topCrop} ${svgWidth} ${svgHeight}`);
   svgEl.style.minWidth = svgWidth + 'px';
 
   [90,110,130,150,170].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));
@@ -1370,6 +1419,14 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
     // juist geraakte rechterhandnoot terugvinden; bij een akkoord (alleen
     // linkerhand) krijgt elke notenkop in het akkoord dezelfde twee, dat
     // wordt daar nog niet gebruikt.
+    // Een beoordeelde noot (goed of gemist) kleurt helemaal in (notenkop én rand),
+    // in plaats van alleen een gekleurde rand om een verder normale notenkop:
+    // dat was in de praktijk te subtiel om in één oogopslag te zien. Geldt niet
+    // voor de paarse "dit moet je nu spelen"-markering (highlight op '#8c73e8'):
+    // dat is geen oordeel maar een aanwijzing, en blijft dus gewoon een rand om
+    // de normale notenkop. Gebeurt sowieso nooit bij de linkerhand: highlight
+    // blijft daar altijd 'none' (zie hierboven), die hand wordt niet beoordeeld.
+    const resultColor = (highlight === '#1f8f68' || highlight === '#d9495f') ? highlight : null;
     pitches.forEach(p => {
       const y = yOfFn(p.step);
       const isC = p.letter === 'C';
@@ -1379,9 +1436,9 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       const offsetX = (stemUp && clashesBelow) ? S(11) : (!stemUp && clashesAbove) ? -S(11) : 0;
       el('ellipse', {
         cx:x + offsetX, cy:y, rx:S(8), ry:S(6),
-        fill: hollow ? '#fff' : fill,
+        fill: resultColor || (hollow ? '#fff' : fill),
         opacity: noteOpacity,
-        stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
+        stroke: resultColor || (highlight !== 'none' ? highlight : (hollow ? fill : 'none')),
         'stroke-width': highlight !== 'none' ? S(2.5) : S(1.8),
         'data-note-index': i, 'data-hand': handPrefix
       }, svgEl);
@@ -1462,6 +1519,10 @@ function render() {
   // een lied laden) is er geen speelstreep en zijn idx/passedIdx gelijk.
   const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, playing ? passedIdx : idx);
   phRect = playhead;
+  // Een grote notenbalk (twee handen) is van zichzelf hoger: in portretstand (zie
+  // CSS) krijgt die daarom een eigen, kleinere hoogtebegrenzing, zodat de hele
+  // kaart ook dan nog op één scherm past.
+  document.querySelector('.staffWrap').classList.toggle('hasLeft', contextNotes.length > 0);
 
   // Staat de microfoon nog uit, dan krijgt de microfoonknop een zachte amber
   // rand (zie CLAUDE.md): geen aparte tekstmelding meer, dat stond nu in de
@@ -1477,7 +1538,7 @@ function render() {
     scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
   }
 
-  renderKeyboard();
+  renderKeyboard(playing ? passedIdx : idx);
 }
 
 // Korte flits bij een juist geraakte noot, zoals in ritmespellen als Guitar Hero:
@@ -1963,13 +2024,11 @@ function tick(now) {
         idx++;
         continue;
       }
-      const m = notes[idx];
       wrongs++;
       streak = 0;
       noteResults[idx] = 'missed';
       idx++;
       missed = true;
-      setFeedback(`Gemist: ${m.label} met R${m.finger}`, 'bad');
     }
 
     // passedIdx loopt los van idx mee, zonder venster/marge: zodra de streep een

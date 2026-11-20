@@ -14,6 +14,31 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   misbruik). Er stond hier ook een losse tekstmelding ("Speel: E4 met R3" / "Zet eerst de
   microfoon aan..."), die is weg: het pianotoetsenbord (zie verderop) laat de te spelen toets
   al zien, een tweede tekstuele versie van diezelfde info was overbodig.
+- Afgesproken gedrag, geen bug: "Speel af" mét geluid (eigen luidspreker) + microfoon tegelijk
+  aan levert geen herkenning op, de noten worden dan niet groen. "Speel af" zónder geluid (de
+  normale manier om te oefenen: je speelt zelf op een echte piano terwijl de notenbalk/het
+  toetsenbord als gids meeloopt) werkt wel gewoon, de microfoon registreert dan je eigen
+  toon en toont de animaties zoals bedoeld. Reden: dit is vermoedelijk geen bug in de
+  herkenning zelf. Getest (digitaal, buiten de speaker/microfoon
+  om, door het geschakelde geluid rechtstreeks af te tappen naar een analyser) dat
+  `detectPitch`/`detectPitchYIN` de juiste toon gewoon herkennen voor het hele notenbereik dat
+  de liedjes gebruiken, zelfs met een ruwe simulatie van een telefoonluidspreker (laagfrequenties
+  weggefilterd, flink wat geluidsverlies): dat wijst níet op een drempel- of algoritmeprobleem.
+  Waarschijnlijker: `getUserMedia` vraagt al `echoCancellation:false`, maar mobiele browsers
+  (vooral iOS Safari) negeren dat vaak, juist omdat akoestische echo-onderdrukking specifiek
+  bedoeld is om het eigen afgespeelde geluid uit de microfoon-opname te filteren (zoals bij
+  een videobelgesprek, zodat je jezelf niet via de ander terughoort) — dat gebeurt dan op
+  OS-niveau, niet iets wat vanuit de pagina is uit te zetten. Dat verklaart ook meteen waarom
+  dit juist mét oordopjes (akoestisch dan helemaal gescheiden) nooit zou werken, en waarom
+  een ANDER apparaat (niet dit toestel) het geluid laten afspelen dicht bij de microfoon, wel
+  zou moeten werken: dat is geen "eigen-geluid", dus geen reden voor de telefoon om het weg te
+  filteren. Twee automatische detectoren het eens laten zijn blijft verder ook gewoon bedoeld
+  voor een echte akoestische piano (of stem) in de kamer, niet voor het eigen afspeel-geluid van
+  het toestel zelf.
+  Zijdelings gevonden tijdens dit onderzoek (geen van beide relevant voor de hierboven
+  gebruikte noten): de herkenning heeft een vast bereik van ongeveer 80Hz tot 1000Hz
+  (`maxLag = sr/80`, `minLag = sr/1000` in beide detectoren), dus zowel een erg lage noot
+  (onder C3) als een erg hoge (boven B5) valt daarbuiten.
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
@@ -34,12 +59,40 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   De rechterhand (R1 t/m R5) kreeg vroeger ook een label onder de noot, maar dat staat nu
   al op het pianotoetsenbord (zie verderop), dus dat label op de notenbalk is weg: twee keer
   dezelfde vingerzetting tonen was overbodig en gaf drukte. Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+  De vaste canvashoogte in `drawGrandStaff` (`fullHeight`) reserveert standaard genoeg ruimte
+  boven de g-sleutel voor een paar hulplijntjes, ook als dit specifieke lied daar nooit gebruik
+  van maakt: dan oogde dat als onnodige witruimte boven de notenbalk. De viewBox snijdt dat stuk
+  nu weg (`topCrop`, alleen het zichtbare kader verandert, alle tekencoördinaten blijven
+  ongewijzigd) tot net genoeg voor de sleutel, of iets meer als dit lied toch hogere noten heeft
+  (`usedRightSteps`, per lied opnieuw berekend over alle noten, niet alleen het zichtbare stuk,
+  anders zou de marge tijdens het spelen zichtbaar verspringen).
   De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
   `STAFF_SCALE` (1,3) in `drawGrandStaff`, via de helper `S(v) = v * STAFF_SCALE`. Er zat te
   veel witruimte in de kaart t.o.v. hoe klein de notatie oogde; dit vergroot alles in verhouding
   (viewBox-breedte/hoogte schalen mee, dus geen scheve aspect ratio). `STAFF_X0`/`NOTE_SPACING`
   zijn de geschaalde basismaten die ook buiten `drawGrandStaff` gebruikt worden (`xOf`, `noteX`,
   `xAtTime`, `timeAtX`, `scrollStaffFollow`); die rekenen niet meer met de losse getallen 110/34.
+- De hele kaart (titel, statistieken, werkbalk, notenbalk, toetsenbord, feedbacktekst) past op
+  één scherm, zonder dat je tijdens het spelen hoeft te scrollen (alleen de bronvermelding
+  onderaan de pagina mag daarbuiten vallen, dat is geen interactief onderdeel). Twee plekken
+  hadden daar apart werk voor nodig, in allebei de gevallen door de notenbalk zelf een kleinere,
+  schermhoogte-afhankelijke hoogte te geven (`width:auto; min-width:0`, met horizontaal scrollen
+  voor lange liederen zoals al gebeurde op een smalle telefoon) in plaats van op volle breedte
+  te schalen:
+  - Liggende telefoon (`@media (orientation:landscape) and (max-height:500px)`): naast de
+    notenbalk zelf (`height:min(44vh,230px)`) zijn ook titel, statistieken en feedbacktekst
+    compacter gemaakt (kleinere `min-height`/`padding`/`line-height`, minder marge ertussen):
+    die hadden allemaal een eigen minimale knop-/touch-target-hoogte (44px) die in deze context
+    meer ruimte opeist dan de inhoud zelf nodig heeft.
+  - Rechtop (portretstand) met een lied met linkerhand (grote notenbalk, twee regels, van
+    zichzelf hoger): `render()` zet een klasse `hasLeft` op `.staffWrap` zodra er een linkerhand
+    is (`contextNotes.length > 0`), en alleen in portretstand (niet in de liggende/brede
+    varianten hierboven, die hebben al hun eigen hoogte) krijgt de notenbalk dan
+    `height:clamp(140px, calc(100vh - 400px), 420px)`: `calc(100vh - 400px)` is de ruimte die
+    overblijft nadat de rest van de kaart (gemeten, vrij stabiel ongeacht schermbreedte) zijn deel
+    al heeft gehad, `clamp()` voorkomt dat dat op een heel klein of heel groot scherm absurd
+    uitpakt. Een lied zonder linkerhand (de normale, enige hand die je oefent) is van zichzelf al
+    laag genoeg en blijft gewoon op volle breedte schalen, ongewijzigd.
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
@@ -89,10 +142,18 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   Beginner heeft een ruim tijdvenster (2 tellen), zodat de juiste toon al telt ook al ben je
   lang niet precies op de tel; dat kost alleen de timingbonus, niet de toonpunten. Beginner is
   het standaardniveau.
-- Gemiste noten (door tick()'s "gemist"-sweep, niet door een verkeerd gespeelde toon) krijgen
-  een rode rand op de notenbalk in plaats van groen, zodat je in één oogopslag ziet welke noten
-  je niet op tijd te pakken kreeg. Bijgehouden in `noteResults` (per noot-index 'hit' of
-  'missed'), gereset bij elk nieuw lied en bij elke nieuwe poging.
+- Gemiste noten (door tick()'s "gemist"-sweep, niet door een verkeerd gespeelde toon) kleuren
+  helemaal rood op de notenbalk (notenkop én rand, niet alleen een rand om een verder normale
+  notenkop: dat was te subtiel om in één oogopslag te zien), een goed gespeelde noot helemaal
+  groen. Bijgehouden in `noteResults` (per noot-index 'hit' of 'missed'), gereset bij elk nieuw
+  lied en bij elke nieuwe poging. Geldt alleen voor de rechterhand: de linkerhand (ter context,
+  niet beoordeeld omdat de pitch-detectie maar één toon tegelijk herkent) blijft altijd gewoon
+  zwart, ook als die toon tegelijk "voorbij" is volgens de speelstreep, want er is geen oordeel
+  om te tonen. De paarse "dit moet je nu spelen"-markering is geen oordeel en blijft daarom wel
+  gewoon een rand om een normale notenkop, niet de hele noot. Geen aparte "Gemist: ..."-tekst
+  in de feedback meer bij een gemiste noot (de rode notenkop en de stand van de speelstreep
+  laten al zien wat er gemist is); bij een op tijd gespeelde noot staat er nog gewoon een
+  positieve feedbacktekst.
 - Een juist geraakte noot krijgt een korte "flits"-animatie (`animateNoteHit()`): de noot veert
   even op en er dijt een ring omheen uit die wegvaagt, zoals in ritmespellen als Guitar Hero.
   Gemiste of nog niet gespeelde noten blijven gewoon staan, geen animatie. Werkt los van
@@ -109,17 +170,23 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tellen nog gewoon door, alleen de tekstmelding bij het afronden is weg.
   Het toetsenbord staat vast: alle 88 toetsen schalen naar de beschikbare breedte in plaats van
   op ware grootte te scrollen met een automatisch meebewegende (en dus steeds verspringende)
-  scrollpositie. 88 toetsen op ware grootte passen niet leesbaar naast elkaar op een
-  telefoonscherm in portretstand, dus daar blijft het toetsenbord verborgen (`display:none`)
-  tot de telefoon liggend gehouden wordt of het scherm breed genoeg is (media query op
-  `orientation: landscape` of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop).
-  Daar staat het toetsenbord bovendien met `position:fixed` vast onderaan het scherm (niet
-  gewoon ergens in de meescrollende kaart): op een telefoon in liggende stand is de kaart vaak
-  hoger dan het scherm (vooral bij een lied met linkerhand), dus zonder dit zou je tijdens het
-  spelen zelf moeten scrollen om het toetsenbord te zien, en leek het net of het "bewoog" omdat
-  zijn plek op het scherm niet stabiel was. `main` krijgt evenveel extra `padding-bottom`
-  gereserveerd (108px, of 76px in de extra compacte telefoon-liggend-variant hieronder) zodat
-  deze vaste balk niet over de feedbacktekst heen schuift.
+  scrollpositie. Altijd zichtbaar, ook rechtop op een smalle telefoon: 88 toetsen passen dan niet
+  breed genoeg om goed leesbaar te zijn, maar dat mag best klein uitpakken (op verzoek), beter
+  dan 'm helemaal te verbergen. Rechtop staat het toetsenbord gewoon in de normale doorloop van
+  de kaart, onder de notenbalk.
+  Op een telefoon in liggende stand of een breder scherm (media query op `orientation: landscape`
+  of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop) staat het toetsenbord
+  bovendien met `position:fixed` vast onderaan het scherm (niet gewoon ergens in de
+  meescrollende kaart): op een telefoon in liggende stand is de kaart vaak hoger dan het scherm
+  (vooral bij een lied met linkerhand), dus zonder dit zou je tijdens het spelen zelf moeten
+  scrollen om het toetsenbord te zien, en leek het net of het "bewoog" omdat zijn plek op het
+  scherm niet stabiel was. `main` krijgt dan evenveel extra `padding-bottom` gereserveerd (108px,
+  of 76px in de extra compacte telefoon-liggend-variant) zodat deze vaste balk niet over de
+  feedbacktekst heen schuift.
+  `renderKeyboard()` kleurt de huidige toets op dezelfde pointer als de notenbalk gebruikt
+  (`playing ? passedIdx : idx`, zie hierboven), niet zomaar op `idx` zelf: tijdens Speel af liep
+  de paarse toets anders niet synchroon met de paarse markering op de notenbalk, omdat `idx` dan
+  bewust wat coulance heeft (venster/`MISS_GRACE_MS`) en `passedIdx` niet.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
@@ -151,6 +218,15 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   pixelmetingen op de bladmuziek) en vult het lied in.
 
 ## Let op
+- Na elke update kan het zijn dat je op je telefoon (vooral mobiele Safari) nog een oude,
+  gecachte versie van de pagina ziet, ook na een gewone herlaad: GitHub Pages stuurt een
+  `cache-control: max-age=600`-header mee, en Safari hergebruikt soms een lokale kopie zonder
+  die te verversen. Zie je iets dat niet klopt met wat hier in CLAUDE.md staat (bijvoorbeeld
+  vingerzetting die er nog oud uitziet), controleer dan eerst of het om een verouderde cache
+  gaat voordat je een "bug" gaat zoeken: open de pagina in een privénavigatievenster (dat
+  gebruikt nooit een cache) of sluit het tabblad helemaal en open de link opnieuw. Er staan
+  best-effort no-cache meta-tags in de `<head>`, maar browsers negeren die meestal voor de
+  echte HTTP-cache.
 - Ode an de vreugde: noten en vingerzetting zijn uit het hoofd ingevuld, nog niet gecontroleerd.
 - Gymnopédie nr. 1: concept (`draft: true`). Controleer tegen de partituur op IMSLP (publiek domein) voordat je die gebruikt.
 - Sinterklaas (Daar wordt aan de deur geklopt): concept (`draft: true`), overgetypt van een foto
