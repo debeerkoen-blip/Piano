@@ -210,7 +210,7 @@
 
   <div class="card searchCard">
     <h2>Zoek klassieke stukken</h2>
-    <p class="sub">Zoek een componist of titel op in IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. De zoekresultaten openen in een nieuw tabblad. Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
+    <p class="sub">Zoek een componist of titel op binnen IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. Dit opent een Google-zoekopdracht in een nieuw tabblad (net als IMSLP's eigen zoekvak doet). Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
     <div class="groupRow searchRow">
       <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin nocturne">
       <button id="musicSearchBtn">Zoek op IMSLP</button>
@@ -946,11 +946,14 @@ async function calibrate() {
 
 // ---------- Zoeken naar klassieke stukken op IMSLP (gratis, publiek domein) ----------
 // Geen eigen databank-oproep: Openopus en IMSLP sturen geen CORS-header mee, dus een
-// fetch vanuit de browser wordt altijd geblokkeerd. In plaats daarvan openen we de
-// IMSLP-zoekpagina zelf in een nieuw tabblad, dat is een gewone linknavigatie.
+// fetch vanuit de browser wordt altijd geblokkeerd. In plaats daarvan openen we een
+// Google-zoekopdracht binnen imslp.org in een nieuw tabblad, dat is een gewone
+// linknavigatie. Dit is exact wat IMSLP's eigen zoekvak doet (nagekeken door hun
+// zoekformulier in te vullen en te kijken waar het naartoe stuurt): "Special:Search"
+// bestaat niet op hun wiki, dus die aanname van eerder bleek fout.
 // Noten voor SONGS worden hier nooit overgenomen: dat gebeurt alleen na controle tegen de partituur.
 function searchMusic(term) {
-  const url = `https://imslp.org/wiki/Special:Search?search=${encodeURIComponent(term)}&fulltext=Search`;
+  const url = `https://www.google.com/search?q=${encodeURIComponent('site:imslp.org ' + term)}`;
   window.open(url, '_blank', 'noopener');
 }
 
