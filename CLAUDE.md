@@ -5,11 +5,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 
 ## Huidige stand
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
-- Microfoon: autocorrelatie in de Web Audio API (`detectPitch`). Herkent één noot tegelijk.
-- Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand).
-- Speel af: een balk loopt over de noten met aftellen (4 tellen). Noten tellen binnen een venster van een halve tel.
+- Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
+- Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
+- Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+- Speel af: een balk loopt over de noten met aftellen (4 tellen).
 - Oefenmodus: alleen toonhoogte, zonder tijd.
-- XP, reeksbonus, sterren per lied (op basis van fouten en gemiste noten).
+- Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
+- XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `draft`.
 - Zoekkaart onder de notenbalk: doorzoekt de gratis Openopus-API (geen sleutel nodig) op componist en titel van klassieke werken. Geeft alleen titel, componist en periode terug, geen noten. Elk resultaat linkt naar IMSLP om de partituur zelf op te zoeken.
 
