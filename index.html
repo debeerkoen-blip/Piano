@@ -76,6 +76,10 @@
   .icon-btn:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .icon-btn[aria-expanded="true"] { background:var(--accent-ring); color:#fff; }
   .icon-btn.warnBtn { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.2); }
+  /* Zonder deze regel wint "display:inline-flex" hierboven van de browser-eigen
+     "[hidden] { display:none }" bij gelijke specificiteit, en blijft een
+     verborgen icoonknop (zoals draftBadge) gewoon zichtbaar. */
+  .icon-btn[hidden] { display:none; }
 
   .tooltip {
     position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
