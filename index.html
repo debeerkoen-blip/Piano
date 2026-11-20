@@ -171,19 +171,23 @@
   .footNote a { color:inherit; }
 
   /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
-     moet spelen. Alle 88 toetsen schalen mee naar de beschikbare breedte, geen
-     scroll/sprong. Alleen genoeg ruimte op een telefoon in liggende stand of
-     een breder scherm (zie media query onderaan), anders passen 88 toetsen
-     niet leesbaar naast elkaar en blijft 'ie verborgen.
-     Vastgezet onderaan het scherm (position:fixed) in plaats van gewoon
-     ergens midden in de meescrollende kaart: op een telefoon in liggende
-     stand is de kaart vaak hoger dan het scherm, dus zonder dit zou je tijdens
-     het spelen zelf moeten scrollen om 'm te kunnen zien, en leek het net of
-     'ie "bewoog" doordat zijn plek op het scherm niet stabiel was. Vast
-     onderaan betekent: altijd zichtbaar, altijd exact dezelfde plek.
-     main krijgt evenveel extra padding-bottom gereserveerd, anders schuift
-     deze balk over de feedbacktekst/legenda heen. */
-  .keyboardWrap { display:none; }
+     moet spelen, en licht op zodra je de noot speelt. Altijd zichtbaar, ook
+     rechtop op een smalle telefoon: 88 toetsen passen dan niet breed genoeg
+     om goed leesbaar te zijn, maar dat mag best klein uitpakken, beter dan
+     'm helemaal te verbergen. Alle 88 toetsen schalen gewoon mee naar de
+     beschikbare breedte, geen scroll/sprong.
+     Op een telefoon in liggende stand of een breder scherm (zie media query
+     onderaan) staat het toetsenbord bovendien met position:fixed vast
+     onderaan het scherm in plaats van gewoon ergens midden in de
+     meescrollende kaart: op een telefoon in liggende stand is de kaart vaak
+     hoger dan het scherm, dus zonder dit zou je tijdens het spelen zelf
+     moeten scrollen om 'm te kunnen zien, en leek het net of 'ie "bewoog"
+     doordat zijn plek op het scherm niet stabiel was. Rechtop is de kaart
+     juist hoger dan breed, dus daar past het toetsenbord gewoon in de
+     normale doorloop van de kaart, onder de notenbalk.
+     main krijgt in de liggende/brede variant evenveel extra padding-bottom
+     gereserveerd, anders schuift die vaste balk over de feedbacktekst heen. */
+  .keyboardWrap { display:block; margin-top:var(--space-4); }
   #keyboard { display:block; width:100%; height:auto; }
   @media (orientation: landscape), (min-width: 700px) {
     .keyboardWrap {
@@ -1104,8 +1108,22 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // xOf/STAFF_X0/NOTE_SPACING zijn al geschaald; alle andere maten hier (lijndiktes,
   // lettergroottes, marges) lopen via S zodat de hele notenbalk in verhouding blijft.
   const S = v => v * STAFF_SCALE;
-  const svgHeight = S(hasLeft ? 420 : 240);
+  const fullHeight = S(hasLeft ? 420 : 240);
   const staffTop = S(90), staffBottom = S(hasLeft ? 330 : 170);
+
+  // De vaste canvashoogte hierboven (fullHeight) laat standaard evenveel ruimte
+  // vrij boven de notenbalk als voor een paar hulplijntjes boven de g-sleutel
+  // nodig zou zijn, ook als dit lied helemaal geen hoge noten heeft: dan oogt
+  // dat als lege witruimte. Het stuk canvas boven de notenbalk snijden we hier
+  // weg (alleen het zichtbare kader via de viewBox, de tekencoördinaten
+  // hieronder blijven ongewijzigd) tot net genoeg voor de sleutel plus, als
+  // dit specifieke lied toch hogere noten heeft, de hulplijntjes die dat nodig
+  // heeft.
+  const usedRightSteps = rightNotes.flatMap(n => n.rest ? [] : n.chord ? n.pitches.map(p => p.step) : [n.step]);
+  const topLineStep = 38;
+  const highestNoteY = usedRightSteps.length ? yOf(Math.max(...usedRightSteps, topLineStep)) : staffTop;
+  const topCrop = Math.max(0, Math.min(staffTop - S(45), highestNoteY - S(18)));
+  const svgHeight = fullHeight - topCrop;
 
   const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
   const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
@@ -1121,7 +1139,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   const svgWidth = hasLeft
     ? Math.max(S(600), STAFF_X0 + lastEndBeat * NOTE_SPACING + S(60))
     : Math.max(S(600), xOf(Math.max(rightNotes.length - 1, 0)) + S(60));
-  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  svgEl.setAttribute('viewBox', `0 ${topCrop} ${svgWidth} ${svgHeight}`);
   svgEl.style.minWidth = svgWidth + 'px';
 
   [90,110,130,150,170].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));

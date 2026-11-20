@@ -34,6 +34,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   De rechterhand (R1 t/m R5) kreeg vroeger ook een label onder de noot, maar dat staat nu
   al op het pianotoetsenbord (zie verderop), dus dat label op de notenbalk is weg: twee keer
   dezelfde vingerzetting tonen was overbodig en gaf drukte. Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+  De vaste canvashoogte in `drawGrandStaff` (`fullHeight`) reserveert standaard genoeg ruimte
+  boven de g-sleutel voor een paar hulplijntjes, ook als dit specifieke lied daar nooit gebruik
+  van maakt: dan oogde dat als onnodige witruimte boven de notenbalk. De viewBox snijdt dat stuk
+  nu weg (`topCrop`, alleen het zichtbare kader verandert, alle tekencoördinaten blijven
+  ongewijzigd) tot net genoeg voor de sleutel, of iets meer als dit lied toch hogere noten heeft
+  (`usedRightSteps`, per lied opnieuw berekend over alle noten, niet alleen het zichtbare stuk,
+  anders zou de marge tijdens het spelen zichtbaar verspringen).
   De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
   `STAFF_SCALE` (1,3) in `drawGrandStaff`, via de helper `S(v) = v * STAFF_SCALE`. Er zat te
   veel witruimte in de kaart t.o.v. hoe klein de notatie oogde; dit vergroot alles in verhouding
@@ -106,17 +113,19 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tellen nog gewoon door, alleen de tekstmelding bij het afronden is weg.
   Het toetsenbord staat vast: alle 88 toetsen schalen naar de beschikbare breedte in plaats van
   op ware grootte te scrollen met een automatisch meebewegende (en dus steeds verspringende)
-  scrollpositie. 88 toetsen op ware grootte passen niet leesbaar naast elkaar op een
-  telefoonscherm in portretstand, dus daar blijft het toetsenbord verborgen (`display:none`)
-  tot de telefoon liggend gehouden wordt of het scherm breed genoeg is (media query op
-  `orientation: landscape` of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop).
-  Daar staat het toetsenbord bovendien met `position:fixed` vast onderaan het scherm (niet
-  gewoon ergens in de meescrollende kaart): op een telefoon in liggende stand is de kaart vaak
-  hoger dan het scherm (vooral bij een lied met linkerhand), dus zonder dit zou je tijdens het
-  spelen zelf moeten scrollen om het toetsenbord te zien, en leek het net of het "bewoog" omdat
-  zijn plek op het scherm niet stabiel was. `main` krijgt evenveel extra `padding-bottom`
-  gereserveerd (108px, of 76px in de extra compacte telefoon-liggend-variant hieronder) zodat
-  deze vaste balk niet over de feedbacktekst heen schuift.
+  scrollpositie. Altijd zichtbaar, ook rechtop op een smalle telefoon: 88 toetsen passen dan niet
+  breed genoeg om goed leesbaar te zijn, maar dat mag best klein uitpakken (op verzoek), beter
+  dan 'm helemaal te verbergen. Rechtop staat het toetsenbord gewoon in de normale doorloop van
+  de kaart, onder de notenbalk.
+  Op een telefoon in liggende stand of een breder scherm (media query op `orientation: landscape`
+  of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop) staat het toetsenbord
+  bovendien met `position:fixed` vast onderaan het scherm (niet gewoon ergens in de
+  meescrollende kaart): op een telefoon in liggende stand is de kaart vaak hoger dan het scherm
+  (vooral bij een lied met linkerhand), dus zonder dit zou je tijdens het spelen zelf moeten
+  scrollen om het toetsenbord te zien, en leek het net of het "bewoog" omdat zijn plek op het
+  scherm niet stabiel was. `main` krijgt dan evenveel extra `padding-bottom` gereserveerd (108px,
+  of 76px in de extra compacte telefoon-liggend-variant) zodat deze vaste balk niet over de
+  feedbacktekst heen schuift.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
