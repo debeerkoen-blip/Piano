@@ -14,9 +14,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   misbruik). Er stond hier ook een losse tekstmelding ("Speel: E4 met R3" / "Zet eerst de
   microfoon aan..."), die is weg: het pianotoetsenbord (zie verderop) laat de te spelen toets
   al zien, een tweede tekstuele versie van diezelfde info was overbodig.
-- "Speel af" met geluid + microfoon tegelijk aan, in de verwachting dat de telefoon zichzelf
-  hoort en de noten dus groen worden: werkt op een echte telefoon meestal niet, en dat is
-  vermoedelijk geen bug in de herkenning zelf. Getest (digitaal, buiten de speaker/microfoon
+- Afgesproken gedrag, geen bug: "Speel af" mét geluid (eigen luidspreker) + microfoon tegelijk
+  aan levert geen herkenning op, de noten worden dan niet groen. "Speel af" zónder geluid (de
+  normale manier om te oefenen: je speelt zelf op een echte piano terwijl de notenbalk/het
+  toetsenbord als gids meeloopt) werkt wel gewoon, de microfoon registreert dan je eigen
+  toon en toont de animaties zoals bedoeld. Reden: dit is vermoedelijk geen bug in de
+  herkenning zelf. Getest (digitaal, buiten de speaker/microfoon
   om, door het geschakelde geluid rechtstreeks af te tappen naar een analyser) dat
   `detectPitch`/`detectPitchYIN` de juiste toon gewoon herkennen voor het hele notenbereik dat
   de liedjes gebruiken, zelfs met een ruwe simulatie van een telefoonluidspreker (laagfrequenties
