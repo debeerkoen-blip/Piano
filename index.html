@@ -475,6 +475,7 @@ let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoor
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let phRect = null, liveMarker = null, liveLabel = null;
+let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
 
 // Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
 // cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
@@ -683,6 +684,21 @@ function render() {
   liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
 
   updateScrollHint();
+  if (notes.length) {
+    const anchorIdx = Math.min(idx, notes.length - 1);
+    scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
+  }
+}
+
+// Schuift de notenbalk automatisch mee: de huidige noot komt links in beeld,
+// met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
+// noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
+function scrollStaffFollow(x, hasPrevious) {
+  const wrap = document.querySelector('.staffWrap');
+  if (!wrap) return;
+  const target = hasPrevious ? x - 34 - 20 : 0;
+  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+  wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
 }
 
 // Toont alleen een hint als de notenbalk breder is dan wat er past.
@@ -1001,6 +1017,7 @@ function tick(now) {
     }
     phRect.setAttribute('x', xAtTime(t) - 1.5);
     phRect.setAttribute('opacity', 1);
+    scrollStaffFollow(xAtTime(t), idx > 0);
   }
   rafId = requestAnimationFrame(tick);
 }
@@ -1202,10 +1219,12 @@ function updateLiveMarker(f1, f2, midi) {
   else if (f1 || f2) { freq = f1 || f2; confident = false; }
 
   if (!freq) {
+    if (performance.now() < liveMarkerHoldUntil) return; // nog even laten staan
     liveMarker.setAttribute('opacity', 0);
     liveLabel.setAttribute('opacity', 0);
     return;
   }
+  liveMarkerHoldUntil = performance.now() + 500;
 
   const rawMidi = Math.round(69 + 12 * Math.log2(freq / 440) - calibrationOffset);
   const noteLabel = midiToLabel(rawMidi);
