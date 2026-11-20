@@ -104,6 +104,7 @@
   .icon-btn:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .icon-btn[aria-expanded="true"] { background:var(--accent-ring); color:#fff; }
   .icon-btn.warnBtn { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.2); }
+  .icon-btn.micOffHint { border-color:var(--bad-text); }
   /* Zonder deze regel wint "display:inline-flex" hierboven van de browser-eigen
      "[hidden] { display:none }" bij gelijke specificiteit, en blijft een
      verborgen icoonknop (zoals draftBadge) gewoon zichtbaar. */
@@ -142,9 +143,20 @@
   .staffToolbar::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
   .toolbarSpacer { flex:1 1 auto; min-width:var(--space-4); }
   .staffWrap {
-    overflow-x:scroll; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
+    position:relative; overflow-x:scroll; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
     scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
   }
+  /* Zachte lay-over met het aftellen, boven op de notenbalk. position:absolute
+     binnen de scrollende .staffWrap blijft vast op het zichtbare stuk staan,
+     scrollt niet met de notenbalk mee. pointer-events:none zodat je er gewoon
+     doorheen kan scrollen/klikken. */
+  .countInOverlay {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(251,250,247,.82); border-radius:var(--radius-s); pointer-events:none;
+    opacity:0; transition:opacity .15s ease; z-index:5;
+  }
+  .countInOverlay.show { opacity:1; }
+  .countInNumber { font-size:72px; font-weight:800; color:var(--accent-ring); }
   .staffWrap::-webkit-scrollbar { height:8px; }
   .staffWrap::-webkit-scrollbar-track { background:transparent; }
   .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
@@ -154,6 +166,7 @@
      tonen. */
   #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
   .playLabel { font-size:16px; color:var(--muted); text-align:center; margin:var(--space-2) 0 0; }
+  .playLabel.micOffHint { color:var(--bad-text); font-weight:600; }
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
 
@@ -393,6 +406,7 @@
 
     <div class="staffWrap">
       <svg id="staff" viewBox="0 0 600 240"></svg>
+      <div class="countInOverlay" id="countInOverlay"><span class="countInNumber" id="countInNumber"></span></div>
     </div>
     <p class="playLabel" id="playLabel"></p>
     <div class="progress"><div id="bar"></div></div>
@@ -935,7 +949,7 @@ function loadSong(s) {
   document.getElementById('draftBadge').hidden = !s.draft;
   document.getElementById('restart').disabled = true;
   document.getElementById('handLegend').hidden = !s.left;
-  setFeedback(micOn ? 'Speel de eerste noot, of druk op Speel af.' : 'Zet eerst de microfoon aan (knopje linksboven), anders kan de app je niet horen.', micOn ? '' : 'bad');
+  setFeedback('Speel de eerste noot, of druk op Speel af.', '');
   render();
   updateStats();
   renderSongList();
@@ -1190,9 +1204,16 @@ function render() {
 
   // Los van de SVG (die zijwaarts kan scrollen) zodat deze tekst altijd
   // gewoon in het midden van het scherm blijft staan, ook bij een lang stuk.
-  document.getElementById('playLabel').textContent = idx < notes.length
-    ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
-    : 'Klaar!';
+  // Staat de microfoon nog uit, dan komt die melding hier te staan in plaats van
+  // "Speel: ...": dat laatste suggereert dat spelen al zou werken.
+  const playLabelEl = document.getElementById('playLabel');
+  playLabelEl.textContent = !micOn
+    ? 'Zet eerst de microfoon aan, anders kan de app je niet horen.'
+    : idx < notes.length
+      ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
+      : 'Klaar!';
+  playLabelEl.classList.toggle('micOffHint', !micOn);
+  document.getElementById('micBtn').classList.toggle('micOffHint', !micOn);
 
   // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.
   liveMarker = el('circle', { cx:0, cy:0, r:6 * STAFF_SCALE, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5 * STAFF_SCALE, opacity:0 });
@@ -1626,9 +1647,12 @@ function tick(now) {
 
   if (t < 0) {
     const countdown = Math.ceil(-t);
-    setFeedback(`Tel mee... ${countdown}`, '');
+    document.getElementById('countInNumber').textContent = countdown;
+    document.getElementById('countInOverlay').classList.add('show');
+    setFeedback('Tel mee...', '');
     phRect.setAttribute('opacity', 0);
   } else {
+    document.getElementById('countInOverlay').classList.remove('show');
     // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
     // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
     //
@@ -1675,6 +1699,7 @@ function stopPlay(completed) {
   rafId = null;
   clearTimeout(userScrollTimer);
   suppressAutoScroll = false;
+  document.getElementById('countInOverlay').classList.remove('show');
   const was = playing;
   playing = false;
   setPlayButtonsState(false);
@@ -1722,6 +1747,7 @@ async function startMic() {
     micOn = true;
     const micBtnEl = document.getElementById('micBtn');
     micBtnEl.classList.add('is-on');
+    micBtnEl.classList.remove('micOffHint');
     micBtnEl.disabled = true;
     setIconLabel(micBtnEl, 'Microfoon actief');
     listenTimer = setInterval(listen, 60);
@@ -2473,7 +2499,10 @@ document.getElementById('tempoPopoverSlider').addEventListener('input', (e) => {
 
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
-  if (ok) setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
+  if (ok) {
+    setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
+    render();
+  }
 });
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
