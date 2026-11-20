@@ -110,6 +110,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   telefoonscherm in portretstand, dus daar blijft het toetsenbord verborgen (`display:none`)
   tot de telefoon liggend gehouden wordt of het scherm breed genoeg is (media query op
   `orientation: landscape` of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop).
+  Daar staat het toetsenbord bovendien met `position:fixed` vast onderaan het scherm (niet
+  gewoon ergens in de meescrollende kaart): op een telefoon in liggende stand is de kaart vaak
+  hoger dan het scherm (vooral bij een lied met linkerhand), dus zonder dit zou je tijdens het
+  spelen zelf moeten scrollen om het toetsenbord te zien, en leek het net of het "bewoog" omdat
+  zijn plek op het scherm niet stabiel was. `main` krijgt evenveel extra `padding-bottom`
+  gereserveerd (108px, of 76px in de extra compacte telefoon-liggend-variant hieronder) zodat
+  deze vaste balk niet over de feedbacktekst heen schuift.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
