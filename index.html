@@ -5,36 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Piano prototype</title>
 <style>
-  :root { --bg:#f7f5f0; --ink:#222; --muted:#777; --ok:#2e9e5b; --bad:#d64545; --accent:#3b6fd4; --line:#e6e2d8; --c:#e8832a; }
+  :root {
+    /* Tussenmaten op een 8pt-raster, micro-ruimtes op 4pt. */
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+    --space-6:24px; --space-8:32px; --space-12:48px;
+    --vp-narrow:480px; --vp-medium:768px; --vp-wide:1100px;
+
+    --bg:#f7f3ff; --bg2:#eefbf4;
+    --surface:#fff;
+    --ink:#2b2640; --muted:#776f93;
+    --border:rgba(43,38,64,.09);
+    --shadow:0 1px 3px rgba(43,38,64,.06);
+
+    --lavender:#d9cbff; --mint:#bdedd9; --peach:#ffe3c9; --gold:#fff3c2;
+    --accent-ring:#8c73e8;
+    --ok-text:#1f8f68; --bad-text:#d9495f;
+    --c-note:#ec8f4c;
+
+    --radius-s:8px; --radius-m:14px; --radius-l:20px; --radius-pill:999px;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  main { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
-  .stats { display:flex; gap:12px; margin-bottom:16px; }
-  .stat { background:#fff; border-radius:12px; padding:10px 14px; flex:1; border:1px solid var(--line); }
-  .stat b { display:block; font-size:20px; }
-  .stat span { font-size:12px; color:var(--muted); }
-  .card { background:#fff; border-radius:14px; padding:16px; border:1px solid var(--line); }
-  svg { width:100%; height:auto; display:block; }
-  .progress { height:8px; background:var(--line); border-radius:4px; margin-top:12px; overflow:hidden; }
-  .progress div { height:100%; background:var(--ok); width:0; transition: width .3s; }
-  .feedback { font-weight:600; min-height:24px; margin-top:10px; }
-  .ok { color:var(--ok); } .bad { color:var(--bad); }
-  .controls { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
-  select, button { font-size:15px; border-radius:10px; padding:10px 16px; }
-  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
-  button:disabled { background:#bbb; cursor:default; }
-  #playBtn { background:var(--ok); }
-  select { border:1px solid var(--line); background:#fff; }
-  .heard { font-size:14px; color:var(--muted); }
-  .soundToggle { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); cursor:pointer; }
-  .legend { font-size:13px; color:var(--muted); margin-top:10px; }
+  html, body { width:100%; }
+  body {
+    margin:0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%);
+    background-attachment: fixed;
+    color:var(--ink);
+  }
+  main { width:100%; max-width: var(--vp-wide); margin-inline:auto; padding: var(--space-6) var(--space-4) var(--space-12); }
+  h1 { font-size:22px; margin:0 0 var(--space-1); line-height:1.25; }
+  .sub { color:var(--muted); margin:0 0 var(--space-6); font-size:14px; max-width:65ch; }
+
+  /* ---------- Statistieken ---------- */
+  .stats { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); flex-wrap:wrap; }
+  .stat {
+    flex:1 1 100px; min-width:90px; text-align:center;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+    box-shadow:var(--shadow); padding:var(--space-3) var(--space-4);
+  }
+  .stat-xp { background: linear-gradient(180deg, var(--lavender) 0%, var(--surface) 75%); }
+  .stat-streak { background: linear-gradient(180deg, var(--peach) 0%, var(--surface) 75%); }
+  .stat-stars { background: linear-gradient(180deg, var(--gold) 0%, var(--surface) 75%); }
+  .statIcon { display:block; font-size:18px; margin-bottom:var(--space-1); }
+  .stat b { display:block; font-size:22px; line-height:1.1; }
+  .statLabel { font-size:12px; color:var(--muted); }
+
+  /* ---------- Notenbalk-kaart ---------- */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
+  .staffWrap {
+    overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
+    scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+  }
+  .staffWrap::-webkit-scrollbar { height:8px; }
+  .staffWrap::-webkit-scrollbar-track { background:transparent; }
+  .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
+  svg { display:block; width:100%; min-width:600px; height:auto; }
+  .scrollHint { font-size:12px; color:var(--muted); margin:var(--space-1) 0 0; text-align:center; }
+
+  .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
+  .progress div { height:100%; background:var(--ok-text); width:0; transition: width .3s; }
+  .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
+  .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
+
+  .legend { font-size:13px; color:var(--muted); margin-top:var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-1) var(--space-4); align-items:center; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
-  .warn { font-size:13px; color:#8a5a00; background:#fff6e0; border-radius:10px; padding:10px 12px; margin-top:14px; }
-  .searchCard { margin-top:16px; }
-  .searchCard h2 { margin:0 0 4px; font-size:16px; }
-  .searchRow input { flex:1; min-width:160px; font-size:15px; border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-family:inherit; }
+  /* ---------- Besturing, gegroepeerd per functie ---------- */
+  .controlGroups { display:flex; flex-wrap:wrap; gap:var(--space-6); margin-top:var(--space-6); }
+  .controlGroup { display:flex; flex-direction:column; gap:var(--space-2); }
+  .groupLabel { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .groupRow { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; }
+
+  select, button, input[type="text"] {
+    font: inherit; font-size:15px; border-radius:var(--radius-pill);
+    padding:0 var(--space-4); min-height:44px; border:1px solid transparent;
+  }
+  select, input[type="text"] { background:var(--surface); border-color:var(--border); color:var(--ink); font-weight:400; }
+  select { min-width:170px; }
+  button { cursor:pointer; color:var(--ink); background:var(--lavender); font-weight:600; }
+  button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
+  #playBtn { background:var(--mint); }
+  .btn-ghost { background:var(--surface); border-color:var(--border); }
+
+  .pill {
+    display:inline-flex; align-items:center; align-self:flex-start; min-height:36px;
+    font-size:13px; color:var(--muted); background:#f1edff;
+    border-radius:var(--radius-pill); padding:0 var(--space-3);
+  }
+
+  .soundToggle {
+    display:flex; align-items:center; gap:var(--space-2); font-size:14px; color:var(--ink); cursor:pointer;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill);
+    padding: var(--space-2) var(--space-4); min-height:44px;
+  }
+  .soundToggle:has(input:checked) { background:var(--peach); border-color:transparent; }
+  .soundToggle input { width:18px; height:18px; accent-color:var(--accent-ring); }
+
+  .warn { font-size:13px; color:#7a5300; background:#fff3d6; border:1px solid rgba(122,83,0,.15); border-radius:var(--radius-m); padding:var(--space-3) var(--space-4); margin-top:var(--space-6); }
+
+  /* ---------- Zoekkaart klassieke stukken ---------- */
+  .searchCard { margin-top:var(--space-6); }
+  .searchCard h2 { margin:0 0 var(--space-1); font-size:17px; }
+  .searchRow input { flex:1 1 200px; min-width:0; }
+
+  :focus-visible { outline:2px solid var(--accent-ring); outline-offset:2px; }
+
+  @media (max-width: 599.98px) {
+    .controlGroups { flex-direction:column; }
+    .controlGroup, .groupRow { width:100%; }
+    .groupRow { flex-direction:column; align-items:stretch; }
+    select, button, .soundToggle, input[type="text"] { width:100%; }
+    .pill { align-self:stretch; justify-content:center; }
+    .searchRow { flex-direction:row; }
+    .searchRow input { width:auto; }
+    .searchRow button { width:auto; flex:0 0 auto; }
+  }
 </style>
 </head>
 <body>
@@ -43,29 +127,50 @@
   <p class="sub">Oefen zonder tijd, of speel af mee met de balk. De microfoon luistert naar je piano.</p>
 
   <div class="stats">
-    <div class="stat"><b id="xp">0</b><span>XP</span></div>
-    <div class="stat"><b id="streak">0</b><span>Reeks</span></div>
-    <div class="stat"><b id="stars">0</b><span>Sterren</span></div>
+    <div class="stat stat-xp"><span class="statIcon" aria-hidden="true">⚡</span><b id="xp">0</b><span class="statLabel">XP</span></div>
+    <div class="stat stat-streak"><span class="statIcon" aria-hidden="true">🔥</span><b id="streak">0</b><span class="statLabel">Reeks</span></div>
+    <div class="stat stat-stars"><span class="statIcon" aria-hidden="true">⭐</span><b id="stars">0</b><span class="statLabel">Sterren</span></div>
   </div>
 
   <div class="card">
-    <svg id="staff" viewBox="0 0 600 240"></svg>
+    <div class="staffWrap">
+      <svg id="staff" viewBox="0 0 600 240"></svg>
+    </div>
+    <p class="scrollHint" id="scrollHint" hidden>↔ Sleep opzij om het hele stuk te zien</p>
     <div class="progress"><div id="bar"></div></div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
     <div class="legend">
-      <i style="background:#e8832a"></i>C-noten &nbsp;
-      <i style="background:#333"></i>overige noten &nbsp;
+      <i style="background:#ec8f4c"></i>C-noten &nbsp;
+      <i style="background:#2b2640"></i>overige noten &nbsp;
       R1 t/m R5 = rechter hand, vinger 1 t/m 5
     </div>
-    <div class="controls">
-      <select id="song"></select>
-      <button id="micBtn">Microfoon aan</button>
-      <button id="calibBtn">Stem af op C</button>
-      <button id="playBtn">Speel af</button>
-      <button id="restart">Opnieuw</button>
-      <label class="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
-      <span class="heard" id="heard">Gehoord: -</span>
-      <span class="heard" id="calibInfo"></span>
+
+    <div class="controlGroups">
+      <div class="controlGroup">
+        <span class="groupLabel">Lied</span>
+        <select id="song"></select>
+      </div>
+
+      <div class="controlGroup">
+        <span class="groupLabel">Microfoon</span>
+        <div class="groupRow">
+          <button id="micBtn">Microfoon aan</button>
+          <button id="calibBtn">Stem af op C</button>
+        </div>
+        <div class="groupRow">
+          <span class="pill" id="heard">Gehoord: -</span>
+          <span class="pill" id="calibInfo"></span>
+        </div>
+      </div>
+
+      <div class="controlGroup">
+        <span class="groupLabel">Afspelen</span>
+        <div class="groupRow">
+          <button id="playBtn">Speel af</button>
+          <button id="restart" class="btn-ghost">Opnieuw</button>
+          <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -74,7 +179,7 @@
   <div class="card searchCard">
     <h2>Zoek klassieke stukken</h2>
     <p class="sub">Zoek een componist of titel op in IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. De zoekresultaten openen in een nieuw tabblad. Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
-    <div class="controls searchRow" style="margin-top:0;">
+    <div class="groupRow searchRow">
       <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin nocturne">
       <button id="musicSearchBtn">Zoek op IMSLP</button>
     </div>
@@ -192,22 +297,22 @@ function updateStats() {
 
 function render() {
   staff.innerHTML = '';
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:590, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' });
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:590, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' });
   clef.textContent = '\u{1D11E}';
 
   // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#dc2626', opacity:0 });
+  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#e0496a', opacity:0 });
 
   // Maatstrepen: één per volle maat, plus een slotstreep aan het eind.
   const beatsPerMeasure = song.beatsPerMeasure || 4;
   for (let i = beatsPerMeasure; i < notes.length; i += beatsPerMeasure) {
     const x = xOf(i) - 17;
-    el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 });
+    el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 });
   }
   if (notes.length) {
     const xEnd = xOf(notes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 });
+    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 });
   }
 
   notes.forEach((n, i) => {
@@ -216,19 +321,19 @@ function render() {
     const opacity = done ? 1 : 0.45;
 
     if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#333', opacity });
+      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity });
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
 
     const y = yOf(n.step);
     const isC = n.letter === 'C';
-    const fill = isC ? '#e8832a' : '#333';
+    const fill = isC ? '#ec8f4c' : '#2b2640';
     const current = i === idx;
     const noteOpacity = (done || current) ? 1 : 0.45;
-    const stroke = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
+    const stroke = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
 
-    if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#333', 'stroke-width':1.5 });
+    if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#2b2640', 'stroke-width':1.5 });
     el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity: noteOpacity, stroke, 'stroke-width':2.5 });
     el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 });
 
@@ -240,6 +345,16 @@ function render() {
   label.textContent = idx < notes.length
     ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
     : 'Klaar!';
+
+  updateScrollHint();
+}
+
+// Toont alleen een hint als de notenbalk breder is dan wat er past.
+function updateScrollHint() {
+  const wrap = document.querySelector('.staffWrap');
+  const hint = document.getElementById('scrollHint');
+  if (!wrap || !hint) return;
+  hint.hidden = wrap.scrollWidth <= wrap.clientWidth + 1;
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
@@ -699,6 +814,8 @@ document.getElementById('playBtn').addEventListener('click', async () => {
 document.getElementById('restart').addEventListener('click', () => {
   loadSong(song);
 });
+
+window.addEventListener('resize', updateScrollHint);
 
 loadSong(song);
 </script>
