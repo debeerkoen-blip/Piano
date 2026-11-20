@@ -157,6 +157,15 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   pixelmetingen op de bladmuziek) en vult het lied in.
 
 ## Let op
+- Na elke update kan het zijn dat je op je telefoon (vooral mobiele Safari) nog een oude,
+  gecachte versie van de pagina ziet, ook na een gewone herlaad: GitHub Pages stuurt een
+  `cache-control: max-age=600`-header mee, en Safari hergebruikt soms een lokale kopie zonder
+  die te verversen. Zie je iets dat niet klopt met wat hier in CLAUDE.md staat (bijvoorbeeld
+  vingerzetting die er nog oud uitziet), controleer dan eerst of het om een verouderde cache
+  gaat voordat je een "bug" gaat zoeken: open de pagina in een privénavigatievenster (dat
+  gebruikt nooit een cache) of sluit het tabblad helemaal en open de link opnieuw. Er staan
+  best-effort no-cache meta-tags in de `<head>`, maar browsers negeren die meestal voor de
+  echte HTTP-cache.
 - Ode an de vreugde: noten en vingerzetting zijn uit het hoofd ingevuld, nog niet gecontroleerd.
 - Gymnopédie nr. 1: concept (`draft: true`). Controleer tegen de partituur op IMSLP (publiek domein) voordat je die gebruikt.
 - Sinterklaas (Daar wordt aan de deur geklopt): concept (`draft: true`), overgetypt van een foto
