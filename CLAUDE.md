@@ -6,6 +6,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 ## Huidige stand
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
+  Staat de microfoon nog uit, dan zegt de feedbacktekst dat expliciet ("Zet eerst de
+  microfoon aan...") in plaats van gewoon "Speel de eerste noot" te suggereren: dat laatste
+  deed niets zolang er niet geluisterd werd, zonder duidelijke reden waarom.
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
@@ -83,6 +86,10 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   nog geen akkoorden, dus dat is teruggebracht tot één noot (C naar F, als V-I slotcadens).
   Controleer tegen de partituur voordat je 'm serieus oefent.
 - Nog niet getest met een echte piano. Test met microfoon in een rustige kamer.
+- iPhone-liggend (landscape, lage viewport): de notenbalk is vergroot op verzoek
+  (`min(48vh, 250px)`, was `min(42vh, 220px)`), maar de pagina was daar al wat hoger dan het
+  scherm vóór die vergroting; nu moet je iets meer scrollen om de hele kaart te zien. Geen
+  nieuw probleem, wel iets groter geworden. Zie "Mogelijke volgende stappen" punt 1.
 - De pianosamples komen van `tonejs.github.io`. In een gesandboxde devomgeving (zoals deze
   cloud-sessie) moet dat host expliciet aan de netwerktoegang zijn toegevoegd, anders faalt de
   fetch stil en hoor je de oudere synthetische klank.
