@@ -93,10 +93,10 @@
   .statLabel { font-size:12px; color:var(--muted); }
 
   /* ---------- Icoonknoppen ---------- */
-  .icon-btn-wrap { position:relative; display:inline-flex; }
+  .icon-btn-wrap { position:relative; display:inline-flex; flex-shrink:0; }
   .icon-btn {
     display:inline-flex; align-items:center; justify-content:center;
-    width:44px; height:44px; padding:0; border-radius:var(--radius-m);
+    width:44px; height:44px; padding:0; border-radius:var(--radius-m); flex-shrink:0;
     background:var(--lavender); color:var(--ink); border:1px solid transparent; cursor:pointer;
   }
   .icon-btn.btn-ghost { background:var(--surface); border-color:var(--border); }
@@ -128,7 +128,18 @@
 
   /* ---------- Notenbalk-kaart ---------- */
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
-  .staffToolbar { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-4); }
+  /* Alle icoonknoppen in één rij: bij te weinig breedte scrolt de werkbalk zelf
+     horizontaal, net als de notenbalk, in plaats van naar een tweede regel te
+     springen. */
+  .staffToolbar {
+    display:flex; flex-wrap:nowrap; gap:var(--space-2); align-items:center;
+    margin-bottom:var(--space-4); overflow-x:auto; -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+    padding-bottom:var(--space-1);
+  }
+  .staffToolbar::-webkit-scrollbar { height:6px; }
+  .staffToolbar::-webkit-scrollbar-track { background:transparent; }
+  .staffToolbar::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
   .toolbarSpacer { flex:1 1 auto; min-width:var(--space-4); }
   .staffWrap {
     overflow-x:scroll; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
