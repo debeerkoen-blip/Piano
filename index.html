@@ -28,6 +28,7 @@
   #playBtn { background:var(--ok); }
   select { border:1px solid var(--line); background:#fff; }
   .heard { font-size:14px; color:var(--muted); }
+  .soundToggle { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); cursor:pointer; }
   .legend { font-size:13px; color:var(--muted); margin-top:10px; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   .warn { font-size:13px; color:#8a5a00; background:#fff6e0; border-radius:10px; padding:10px 12px; margin-top:14px; }
@@ -58,6 +59,7 @@
       <button id="micBtn">Microfoon aan</button>
       <button id="playBtn">Speel af</button>
       <button id="restart">Opnieuw</button>
+      <label class="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
       <span class="heard" id="heard">Gehoord: -</span>
     </div>
   </div>
@@ -261,6 +263,24 @@ function finish() {
 }
 
 // ---------- Speel af: balk loopt over de noten ----------
+let scheduledOscillators = [];
+
+function scheduleNoteSound(midi, when, duration) {
+  const freq = 440 * Math.pow(2, (midi - 69) / 12);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, when);
+  gain.gain.linearRampToValueAtTime(0.2, when + 0.015);
+  gain.gain.linearRampToValueAtTime(0, when + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(when);
+  osc.stop(when + duration + 0.02);
+  scheduledOscillators.push(osc);
+}
+
 function startPlay() {
   stopPlay(false);
   idx = 0; wrongs = 0; streak = 0;
@@ -271,6 +291,15 @@ function startPlay() {
   setFeedback('Tel mee...', '');
   render();
   updateStats();
+
+  if (document.getElementById('soundToggle').checked && audioCtx) {
+    const beatSec = beatMs / 1000;
+    const audioStart = audioCtx.currentTime;
+    notes.forEach(n => {
+      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, beatSec * 0.8);
+    });
+  }
+
   rafId = requestAnimationFrame(tick);
 }
 
@@ -307,6 +336,8 @@ function tick(now) {
 }
 
 function stopPlay(completed) {
+  scheduledOscillators.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledOscillators = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
   const was = playing;
