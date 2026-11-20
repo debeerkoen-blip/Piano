@@ -172,8 +172,17 @@
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
 
-  .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
-  .progress div { height:100%; background:var(--ok-text); width:0; transition: width .3s; }
+  /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
+     moet spelen. Zelfde horizontaal-scrollende aanpak als de notenbalk, want 88
+     toetsen naast elkaar passen niet op een telefoonscherm. */
+  .keyboardWrap {
+    overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
+    margin-top:var(--space-4); scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+  }
+  .keyboardWrap::-webkit-scrollbar { height:8px; }
+  .keyboardWrap::-webkit-scrollbar-track { background:transparent; }
+  .keyboardWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
+  #keyboard { display:block; width:100%; min-width:600px; height:auto; }
   .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
 
@@ -322,7 +331,8 @@
     .staffToolbar { margin-bottom: var(--space-2); }
     #staff { width: auto; min-width: 0; height: min(48vh, 250px); }
     .playLabel { font-size: 13px; margin-top: var(--space-1); }
-    .progress { margin-top: var(--space-2); height: 6px; }
+    .keyboardWrap { margin-top: var(--space-2); }
+    #keyboard { width: auto; min-width: 0; height: 70px; }
     .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
   }
 </style>
@@ -411,7 +421,9 @@
       <div class="countInOverlay" id="countInOverlay"><span class="countInNumber" id="countInNumber"></span></div>
     </div>
     <p class="playLabel" id="playLabel"></p>
-    <div class="progress"><div id="bar"></div></div>
+    <div class="keyboardWrap">
+      <svg id="keyboard"></svg>
+    </div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
   </div>
 
@@ -850,6 +862,84 @@ function el(tag, attrs, parent = staff) {
   parent.appendChild(e);
   return e;
 }
+
+// ---------- Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger
+// je nu moet spelen, in plaats van de voortgangsbalk. ----------
+const PIANO_LOW_MIDI = 21, PIANO_HIGH_MIDI = 108; // A0 .. C8
+const WHITE_PITCH_CLASSES = new Set([0, 2, 4, 5, 7, 9, 11]); // C D E F G A B
+function isWhiteKeyMidi(m) { return WHITE_PITCH_CLASSES.has(((m % 12) + 12) % 12); }
+
+const KEY_WHITE_W = 32, KEY_WHITE_H = 110;
+const KEY_BLACK_W = 19, KEY_BLACK_H = 68;
+
+// Elke toets z'n x-positie: witte toetsen gewoon op een rij, zwarte toetsen op de
+// grens tussen de vorige en volgende witte toets (een gangbare vereenvoudiging
+// voor een webklavier, geen millimeter-precieze pianobouw).
+function buildKeyboardLayout() {
+  const keys = [];
+  let whiteIndex = 0;
+  for (let m = PIANO_LOW_MIDI; m <= PIANO_HIGH_MIDI; m++) {
+    if (isWhiteKeyMidi(m)) {
+      keys.push({ midi: m, white: true, x: whiteIndex * KEY_WHITE_W });
+      whiteIndex++;
+    } else {
+      keys.push({ midi: m, white: false, x: whiteIndex * KEY_WHITE_W - KEY_BLACK_W / 2 });
+    }
+  }
+  return { keys, whiteCount: whiteIndex };
+}
+const { keys: KEYBOARD_LAYOUT, whiteCount: KEYBOARD_WHITE_COUNT } = buildKeyboardLayout();
+const KEYBOARD_SVG_WIDTH = KEYBOARD_WHITE_COUNT * KEY_WHITE_W;
+
+// Tekent alle 88 toetsen opnieuw en licht de huidige noot (rechterhand, degene
+// die je moet spelen) op met de vingerzetting erop, net als de paarse "huidige
+// noot"-markering op de notenbalk. Geen highlight als het lied klaar is of nog
+// niet geladen.
+function renderKeyboard() {
+  const svgEl = document.getElementById('keyboard');
+  svgEl.innerHTML = '';
+  svgEl.setAttribute('viewBox', `0 0 ${KEYBOARD_SVG_WIDTH} ${KEY_WHITE_H}`);
+  svgEl.style.minWidth = KEYBOARD_SVG_WIDTH + 'px';
+
+  const current = idx < notes.length ? notes[idx] : null;
+  const currentMidi = current ? current.midi : null;
+
+  KEYBOARD_LAYOUT.filter(k => k.white).forEach(k => {
+    const isCurrent = k.midi === currentMidi;
+    el('rect', {
+      x: k.x, y: 0, width: KEY_WHITE_W - 1, height: KEY_WHITE_H, rx: 3,
+      fill: isCurrent ? '#8c73e8' : '#fff', stroke: '#2b2640', 'stroke-width': 1
+    }, svgEl);
+    if (isCurrent) {
+      el('text', {
+        x: k.x + (KEY_WHITE_W - 1) / 2, y: KEY_WHITE_H - 14, 'font-size': 14,
+        'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
+      }, svgEl).textContent = 'R' + current.finger;
+    }
+  });
+  KEYBOARD_LAYOUT.filter(k => !k.white).forEach(k => {
+    const isCurrent = k.midi === currentMidi;
+    el('rect', {
+      x: k.x, y: 0, width: KEY_BLACK_W, height: KEY_BLACK_H, rx: 2,
+      fill: isCurrent ? '#8c73e8' : '#2b2640'
+    }, svgEl);
+    if (isCurrent) {
+      el('text', {
+        x: k.x + KEY_BLACK_W / 2, y: KEY_BLACK_H - 9, 'font-size': 11,
+        'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
+      }, svgEl).textContent = 'R' + current.finger;
+    }
+  });
+
+  if (currentMidi !== null) {
+    const wrap = document.querySelector('.keyboardWrap');
+    const keyInfo = KEYBOARD_LAYOUT.find(k => k.midi === currentMidi);
+    const keyW = keyInfo.white ? KEY_WHITE_W : KEY_BLACK_W;
+    const target = keyInfo.x + keyW / 2 - wrap.clientWidth / 2;
+    const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+    wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  }
+}
 // Schaal van de hele notenbalk (afstand tussen noten, lijnafstand, en alle
 // lettergroottes/lijndiktes in drawGrandStaff): vergroot op verzoek, omdat de
 // notatie anders te klein oogde t.o.v. de rest van de kaart. Hoger zetten maakt
@@ -972,8 +1062,6 @@ function updateStats() {
   document.getElementById('xp').textContent = xp;
   document.getElementById('streak').textContent = streak;
   document.getElementById('stars').textContent = totalStars;
-  const pct = notes.length ? (idx / notes.length) * 100 : 0;
-  document.getElementById('bar').style.width = pct + '%';
 }
 
 // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
@@ -1235,6 +1323,8 @@ function render() {
     const anchorIdx = Math.min(idx, notes.length - 1);
     scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
   }
+
+  renderKeyboard();
 }
 
 // Korte flits bij een juist geraakte noot, zoals in ritmespellen als Guitar Hero:
@@ -1368,7 +1458,6 @@ function onHeard(midi, tEvent) {
 function finish() {
   const stars = wrongs === 0 ? 3 : wrongs <= 2 ? 2 : 1;
   totalStars += stars;
-  setFeedback(`Klaar! ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}`, 'ok');
   document.getElementById('restart').disabled = false;
   updateStats();
 }
