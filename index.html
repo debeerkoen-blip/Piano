@@ -433,34 +433,89 @@ function finish() {
 }
 
 // ---------- Speel af: balk loopt over de noten ----------
-let scheduledOscillators = [];
+let scheduledSources = [];
+let noiseBuffer = null, noiseBufferCtx = null;
 
-// Benadering van een pianoklank: grondtoon plus een paar boventonen,
-// elk met een korte aanzet en een exponentieel wegstervende klank.
-// Geen echte pianosample, maar klinkt wel voller dan een kale sinustoon.
-const PIANO_HARMONICS = [
-  { mult: 1, level: 0.22 },
-  { mult: 2, level: 0.10 },
-  { mult: 3, level: 0.05 },
-  { mult: 4, level: 0.025 }
+// Benadering van een pianoklank, opgebouwd uit een paar pianospecifieke eigenschappen
+// in plaats van een kale sinustoon:
+// - boventonen liggen niet precies op een geheel veelvoud van de grondtoon (inharmoniciteit,
+//   sterker bij lage snaren) en sterven sneller uit dan de grondtoon, zodat de klank
+//   tijdens het wegsterven doffer wordt, net als bij een echte snaar;
+// - de grondtoon en eerste boventoon komen van twee licht verstemde oscillators (unisono-
+//   snaren), wat het typische zachte zweven van een piano geeft;
+// - een korte ruisimpuls bij de aanslag simuleert de tik van de hamer op de snaar.
+const PIANO_PARTIALS = [
+  { n: 1, level: 0.30, unison: true },
+  { n: 2, level: 0.20, unison: true },
+  { n: 3, level: 0.13, unison: false },
+  { n: 4, level: 0.085, unison: false },
+  { n: 5, level: 0.055, unison: false },
+  { n: 6, level: 0.035, unison: false },
+  { n: 7, level: 0.022, unison: false },
+  { n: 8, level: 0.014, unison: false }
 ];
+
+function getNoiseBuffer(ctx) {
+  if (noiseBuffer && noiseBufferCtx === ctx) return noiseBuffer;
+  const length = Math.floor(ctx.sampleRate * 0.05);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  noiseBuffer = buffer;
+  noiseBufferCtx = ctx;
+  return buffer;
+}
+
+function scheduleHammerNoise(when, freq) {
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoiseBuffer(audioCtx);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = Math.min(freq * 2.5, 8000);
+  filter.Q.value = 0.7;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.05, when);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.02);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(when);
+  src.stop(when + 0.03);
+  scheduledSources.push(src);
+}
 
 function scheduleNoteSound(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
-  PIANO_HARMONICS.forEach(h => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq * h.mult;
-    gain.gain.setValueAtTime(0, when);
-    gain.gain.linearRampToValueAtTime(h.level, when + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start(when);
-    osc.stop(when + duration + 0.05);
-    scheduledOscillators.push(osc);
+  // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
+  const detuneCents = (Math.random() - 0.5) * 3;
+  // Dikkere, lage snaren zijn sterker inharmonisch dan dunne, hoge snaren.
+  const B = Math.min(0.004, Math.max(0.00005, 0.0009 * Math.pow(2, (48 - midi) / 12)));
+
+  PIANO_PARTIALS.forEach(p => {
+    const n = p.n;
+    const partialFreq = freq * n * Math.sqrt(1 + B * n * n) * Math.pow(2, detuneCents / 1200);
+    const decayTime = Math.max(0.15, duration / Math.sqrt(n));
+    const attack = 0.004 + 0.01 / n;
+    const voicesCents = p.unison ? [-4, 4] : [0];
+    voicesCents.forEach(cents => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = partialFreq * Math.pow(2, cents / 1200);
+      const level = p.level / voicesCents.length;
+      gain.gain.setValueAtTime(0, when);
+      gain.gain.linearRampToValueAtTime(level, when + attack);
+      gain.gain.exponentialRampToValueAtTime(level * 0.3, when + attack + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + attack + decayTime);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(when);
+      osc.stop(when + attack + decayTime + 0.05);
+      scheduledSources.push(osc);
+    });
   });
+
+  scheduleHammerNoise(when, freq);
 }
 
 function startPlay() {
@@ -526,8 +581,8 @@ function tick(now) {
 }
 
 function stopPlay(completed) {
-  scheduledOscillators.forEach(o => { try { o.stop(); } catch (e) {} });
-  scheduledOscillators = [];
+  scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledSources = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
   const was = playing;
