@@ -41,7 +41,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke
   3 halve tonen), de tussenliggende toonhoogtes worden gepitcht met `playbackRate`. Een noot
   stopt na haar eigen tel-duur met een korte fade (demper), niet pas als de hele opname is
-  uitgeklonken. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
+  uitgeklonken. `ensureAudioCtx()` maakt de audioCtx + laadt de samples (idempotent: een tweede
+  aanroep hergebruikt de bestaande, in plaats van 'm te vervangen); zowel de microfoon als het
+  aantikken van een losse noot gebruiken die ene functie. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
   de oudere synthetische pianoklank (oscillators met boventonen, inharmoniciteit en een
   hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina. Naast
   "Speel af" staat een los icoontje dat altijd met pianogeluid afspeelt, ook als "Met geluid"
@@ -58,6 +60,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - De live-indicator blijft minstens een halve seconde zichtbaar na het laatste signaal, in
   plaats van meteen te verdwijnen zodra de toon wegvalt.
 - Oefenmodus: alleen toonhoogte, zonder tijd.
+- Op een noot tikken laat 'm horen (de echte pianoklank, via `ensureAudioCtx()` +
+  `scheduleNoteSound()`), handig om te weten hoe de toon klinkt voordat je 'm zelf speelt.
+  Alleen op de hand die je oefent (rechts), en alleen als er niet wordt afgespeeld (anders
+  loopt het door elkaar met de speelstreep en het handmatig scrollen). Elke noot heeft een
+  onzichtbare, ruimere tikzone (`r:18`, vóór schaling) boven op de echte notenkop, voor
+  makkelijker raken met je vinger.
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
   Beginner heeft een ruim tijdvenster (2 tellen), zodat de juiste toon al telt ook al ben je
   lang niet precies op de tel; dat kost alleen de timingbonus, niet de toonpunten. Beginner is

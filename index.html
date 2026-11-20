@@ -1164,6 +1164,16 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       if (isDotted(dur)) {
         el('ellipse', { cx:x + offsetX + S(15), cy:y, rx:S(1.8), ry:S(1.8), fill, opacity: noteOpacity }, svgEl);
       }
+      // Onzichtbare, ruimere tikzone boven op de echte (kleine) notenkop, zodat
+      // je 'm met je vinger makkelijk raakt. Alleen op de hand die je oefent
+      // (isActiveHand): dat is de toon die je moet spelen. Werkt alleen als er
+      // niet wordt afgespeeld, zie de click-listener onderaan.
+      if (isActiveHand && !previewMode) {
+        el('circle', {
+          cx:x + offsetX, cy:y, r:S(18), fill:'transparent', 'pointer-events':'all',
+          'data-midi': p.midi, style:'cursor:pointer'
+        }, svgEl);
+      }
     });
 
     if (hasStem) {
@@ -1755,14 +1765,25 @@ function micErrorText(err) {
   }
 }
 
+// Maakt audioCtx aan als die nog niet bestaat (voor zowel de microfoon als het
+// beluisteren van een losse noot door erop te klikken), en laadt de pianosamples
+// er dan meteen bij. Idempotent: een tweede aanroep hergebruikt gewoon de
+// bestaande audioCtx, in plaats van 'm te vervangen en de samples opnieuw te laden.
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    loadPianoSamples(audioCtx);
+  }
+  return audioCtx;
+}
+
 async function startMic() {
   if (micOn) return true;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
     });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    loadPianoSamples(audioCtx); // alvast op de achtergrond, klaar voordat "Speel af" ze nodig heeft
+    ensureAudioCtx();
     const src = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
@@ -2527,6 +2548,17 @@ document.getElementById('micBtn').addEventListener('click', async () => {
     setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
     render();
   }
+});
+
+// Op een noot tikken laat 'm horen: handig om te weten hoe de toon klinkt
+// voordat je 'm zelf speelt. Alleen in oefenmodus, niet tijdens Speel af (daar
+// zou het door elkaar lopen met de speelstreep en het handmatig scrollen).
+document.getElementById('staff').addEventListener('click', (e) => {
+  if (playing) return;
+  const midiAttr = e.target.getAttribute('data-midi');
+  if (midiAttr === null) return;
+  ensureAudioCtx();
+  scheduleNoteSound(Number(midiAttr), audioCtx.currentTime, 0.6);
 });
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
