@@ -117,6 +117,15 @@
   }
   .icon-btn:hover + .tooltip, .icon-btn:focus-visible + .tooltip { opacity:1; }
 
+  .tempoPopover {
+    position:absolute; top:calc(100% + 8px); right:0;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+    box-shadow:0 4px 16px rgba(43,38,64,.18); padding:var(--space-3) var(--space-4);
+    width:200px; max-width:calc(100vw - 2 * var(--space-4));
+    z-index:25; display:flex; flex-direction:column; gap:var(--space-2);
+  }
+  .tempoPopover[hidden] { display:none; }
+
   /* ---------- Notenbalk-kaart ---------- */
   .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
   .staffToolbar { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-4); }
@@ -341,6 +350,13 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21h6l-1.5-16h-3z"/><path d="M12 7v10"/><circle cx="14.4" cy="12.5" r="1.1" fill="currentColor" stroke="none"/></svg>
         </button>
         <span class="tooltip" id="tip-metronome" role="tooltip">Metronoom aan</span>
+        <div class="tempoPopover" id="tempoPopover" hidden>
+          <span class="groupLabel">Tempo</span>
+          <div class="groupRow">
+            <input type="range" id="tempoPopoverSlider" min="50" max="150" step="5" value="100" aria-label="Afspeeltempo, percentage van het liedtempo">
+            <span class="pill" id="tempoPopoverValue">100%</span>
+          </div>
+        </div>
       </span>
 
       <span class="toolbarSpacer" aria-hidden="true"></span>
@@ -2132,9 +2148,21 @@ document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
 });
 
+// Tempo staat op twee plekken (Instellingen en de popover bij de metronoom), die
+// moeten synchroon blijven: één functie die altijd beide bijwerkt.
+function setTempoScale(pct) {
+  tempoScale = pct / 100;
+  const label = `${pct}%`;
+  document.getElementById('tempoSlider').value = pct;
+  document.getElementById('tempoValue').textContent = label;
+  document.getElementById('tempoPopoverSlider').value = pct;
+  document.getElementById('tempoPopoverValue').textContent = label;
+}
 document.getElementById('tempoSlider').addEventListener('input', (e) => {
-  tempoScale = Number(e.target.value) / 100;
-  document.getElementById('tempoValue').textContent = `${e.target.value}%`;
+  setTempoScale(Number(e.target.value));
+});
+document.getElementById('tempoPopoverSlider').addEventListener('input', (e) => {
+  setTempoScale(Number(e.target.value));
 });
 
 document.getElementById('micBtn').addEventListener('click', async () => {
@@ -2144,11 +2172,38 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 
 document.getElementById('calibBtn').addEventListener('click', calibrate);
 
-document.getElementById('metronomeBtn').addEventListener('click', (e) => {
+// Metronoomknop: een gewone tik schakelt hem aan/uit, lang indrukken toont in
+// plaats daarvan het tempo-schuifje (hetzelfde als in Instellingen) in een
+// popover, zodat je het tempo kunt bijstellen zonder het paneel te openen.
+const metronomeBtn = document.getElementById('metronomeBtn');
+const tempoPopover = document.getElementById('tempoPopover');
+const METRONOME_LONG_PRESS_MS = 450;
+let metronomeLongPressTimer = null;
+let metronomeLongPressFired = false;
+
+metronomeBtn.addEventListener('pointerdown', () => {
+  metronomeLongPressFired = false;
+  clearTimeout(metronomeLongPressTimer);
+  metronomeLongPressTimer = setTimeout(() => {
+    metronomeLongPressFired = true;
+    tempoPopover.hidden = false;
+  }, METRONOME_LONG_PRESS_MS);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => {
+  metronomeBtn.addEventListener(evt, () => clearTimeout(metronomeLongPressTimer));
+});
+
+metronomeBtn.addEventListener('click', () => {
+  if (metronomeLongPressFired) { metronomeLongPressFired = false; return; } // lang indrukken opende het tempo, niet schakelen
   metronomeOn = !metronomeOn;
-  const btn = e.currentTarget;
-  btn.classList.toggle('is-on', metronomeOn);
-  setIconLabel(btn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+  metronomeBtn.classList.toggle('is-on', metronomeOn);
+  setIconLabel(metronomeBtn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+});
+
+document.addEventListener('pointerdown', (e) => {
+  if (tempoPopover.hidden) return;
+  if (tempoPopover.contains(e.target) || metronomeBtn.contains(e.target)) return;
+  tempoPopover.hidden = true;
 });
 
 // Scrol je tijdens Speel af zelf over de notenbalk, dan pauzeert het automatisch
