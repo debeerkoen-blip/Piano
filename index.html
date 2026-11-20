@@ -5,55 +5,150 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Piano prototype</title>
 <style>
-  :root { --bg:#f7f5f0; --ink:#222; --muted:#777; --ok:#2e9e5b; --bad:#d64545; --accent:#3b6fd4; --line:#e6e2d8; --c:#e8832a; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  main { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
-  .stats { display:flex; gap:12px; margin-bottom:16px; }
-  .stat { background:#fff; border-radius:12px; padding:10px 14px; flex:1; border:1px solid var(--line); }
-  .stat b { display:block; font-size:20px; }
-  .stat span { font-size:12px; color:var(--muted); }
-  .card { background:#fff; border-radius:14px; padding:16px; border:1px solid var(--line); }
-  svg { width:100%; height:auto; display:block; }
-  .progress { height:8px; background:var(--line); border-radius:4px; margin-top:12px; overflow:hidden; }
-  .progress div { height:100%; background:var(--ok); width:0; transition: width .3s; }
-  .feedback { font-weight:600; min-height:24px; margin-top:10px; }
-  .ok { color:var(--ok); } .bad { color:var(--bad); }
-  .controls { display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap; }
-  select, button { font-size:15px; border-radius:10px; padding:10px 16px; }
-  button { background:var(--accent); color:#fff; border:0; cursor:pointer; }
-  button:disabled { background:#bbb; cursor:default; }
-  #playBtn { background:var(--ok); }
-  select { border:1px solid var(--line); background:#fff; }
-  .heard { font-size:14px; color:var(--muted); }
-  .soundToggle { display:flex; align-items:center; gap:6px; font-size:14px; color:var(--muted); cursor:pointer; }
-  .legend { font-size:13px; color:var(--muted); margin-top:10px; }
-  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
-  .warn { font-size:13px; color:#8a5a00; background:#fff6e0; border-radius:10px; padding:10px 12px; margin-top:14px; }
+  :root {
+    /* Tussenmaten op een 8pt-raster, micro-ruimtes op 4pt. */
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+    --space-6:24px; --space-8:32px; --space-12:48px;
+    --vp-narrow:480px; --vp-medium:768px; --vp-wide:1100px;
 
-  .addCard { margin-top:16px; }
-  .ghostBtn { background:#fff; color:var(--accent); border:1.5px solid var(--accent); }
-  .deleteBtn { background:#fff; color:var(--bad); border:1.5px solid var(--bad); padding:6px 10px; font-size:13px; }
-  .fileLabel { display:block; font-size:13px; color:var(--muted); margin-top:14px; }
-  .fileLabel input { display:block; margin-top:6px; }
-  .refPreview { margin-top:10px; }
-  .refPreview img { max-width:100%; max-height:420px; border-radius:8px; border:1px solid var(--line); display:block; }
-  .refPreview embed { width:100%; height:420px; border-radius:8px; border:1px solid var(--line); }
-  .formRow { display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; }
-  .formRow label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
-  .formRow input { font-size:15px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); width:140px; }
-  .noteRows { margin-top:14px; display:flex; flex-direction:column; gap:6px; }
-  .noteRow { display:flex; gap:6px; align-items:center; background:var(--bg); border-radius:8px; padding:6px 8px; flex-wrap:wrap; }
-  .noteRow select { padding:6px 8px; font-size:14px; }
+    --bg:#f7f3ff; --bg2:#eefbf4;
+    --surface:#fff;
+    --ink:#2b2640; --muted:#776f93;
+    --border:rgba(43,38,64,.09);
+    --shadow:0 1px 3px rgba(43,38,64,.06);
+
+    --lavender:#d9cbff; --mint:#bdedd9; --peach:#ffe3c9; --gold:#fff3c2;
+    --accent-ring:#8c73e8;
+    --ok-text:#1f8f68; --bad-text:#d9495f;
+    --c-note:#ec8f4c;
+
+    --radius-s:8px; --radius-m:14px; --radius-l:20px; --radius-pill:999px;
+  }
+  * { box-sizing: border-box; }
+  html, body { width:100%; }
+  body {
+    margin:0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: linear-gradient(160deg, var(--bg) 0%, var(--bg2) 100%);
+    background-attachment: fixed;
+    color:var(--ink);
+  }
+  main { width:100%; max-width: var(--vp-wide); margin-inline:auto; padding: var(--space-6) var(--space-4) var(--space-12); }
+  h1 { font-size:22px; margin:0 0 var(--space-1); line-height:1.25; }
+  .sub { color:var(--muted); margin:0 0 var(--space-6); font-size:14px; max-width:65ch; }
+
+  /* ---------- Statistieken ---------- */
+  .stats { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); flex-wrap:wrap; }
+  .stat {
+    flex:1 1 100px; min-width:90px; text-align:center;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-m);
+    box-shadow:var(--shadow); padding:var(--space-3) var(--space-4);
+  }
+  .stat-xp { background: linear-gradient(180deg, var(--lavender) 0%, var(--surface) 75%); }
+  .stat-streak { background: linear-gradient(180deg, var(--peach) 0%, var(--surface) 75%); }
+  .stat-stars { background: linear-gradient(180deg, var(--gold) 0%, var(--surface) 75%); }
+  .statIcon { display:block; font-size:18px; margin-bottom:var(--space-1); }
+  .stat b { display:block; font-size:22px; line-height:1.1; }
+  .statLabel { font-size:12px; color:var(--muted); }
+
+  /* ---------- Notenbalk-kaart ---------- */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l); box-shadow:var(--shadow); padding:var(--space-4); }
+  .staffWrap {
+    overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
+    scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+  }
+  .staffWrap::-webkit-scrollbar { height:8px; }
+  .staffWrap::-webkit-scrollbar-track { background:transparent; }
+  .staffWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
+  svg { display:block; width:100%; min-width:600px; height:auto; }
+  .scrollHint { font-size:12px; color:var(--muted); margin:var(--space-1) 0 0; text-align:center; }
+
+  .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
+  .progress div { height:100%; background:var(--ok-text); width:0; transition: width .3s; }
+  .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
+  .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
+
+  .legend { font-size:13px; color:var(--muted); margin-top:var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-1) var(--space-4); align-items:center; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+  /* ---------- Besturing, gegroepeerd per functie ---------- */
+  .controlGroups { display:flex; flex-wrap:wrap; gap:var(--space-6); margin-top:var(--space-6); }
+  .controlGroup { display:flex; flex-direction:column; gap:var(--space-2); }
+  .groupLabel { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .groupRow { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; }
+
+  select, button, input[type="text"] {
+    font: inherit; font-size:15px; border-radius:var(--radius-pill);
+    padding:0 var(--space-4); min-height:44px; border:1px solid transparent;
+  }
+  select, input[type="text"] { background:var(--surface); border-color:var(--border); color:var(--ink); font-weight:400; }
+  select { min-width:170px; }
+  button { cursor:pointer; color:var(--ink); background:var(--lavender); font-weight:600; }
+  button:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
+  #playBtn { background:var(--mint); }
+  .btn-ghost { background:var(--surface); border-color:var(--border); }
+
+  .pill {
+    display:inline-flex; align-items:center; align-self:flex-start; min-height:36px;
+    font-size:13px; color:var(--muted); background:#f1edff;
+    border-radius:var(--radius-pill); padding:0 var(--space-3);
+  }
+
+  .soundToggle {
+    display:flex; align-items:center; gap:var(--space-2); font-size:14px; color:var(--ink); cursor:pointer;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill);
+    padding: var(--space-2) var(--space-4); min-height:44px;
+  }
+  .soundToggle:has(input:checked) { background:var(--peach); border-color:transparent; }
+  .soundToggle input { width:18px; height:18px; accent-color:var(--accent-ring); }
+
+  .warn { font-size:13px; color:#7a5300; background:#fff3d6; border:1px solid rgba(122,83,0,.15); border-radius:var(--radius-m); padding:var(--space-3) var(--space-4); margin-top:var(--space-6); }
+
+  /* ---------- Zoekkaart klassieke stukken ---------- */
+  .searchCard { margin-top:var(--space-6); }
+  .searchCard h2 { margin:0 0 var(--space-1); font-size:17px; }
+  .searchRow input { flex:1 1 200px; min-width:0; }
+
+  /* ---------- Lied toevoegen vanaf foto/pdf ---------- */
+  .addCard { margin-top:var(--space-6); }
+  .fileLabel { display:block; font-size:13px; color:var(--muted); margin-top:var(--space-4); }
+  .fileLabel input { display:block; margin-top:var(--space-2); }
+  .refPreview { margin-top:var(--space-3); }
+  .refPreview img { max-width:100%; max-height:420px; border-radius:var(--radius-m); border:1px solid var(--border); display:block; }
+  .refPreview embed { width:100%; height:420px; border-radius:var(--radius-m); border:1px solid var(--border); }
+  .formRow { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-top:var(--space-4); }
+  .formRow label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:var(--space-1); }
+  .formRow input {
+    font: inherit; font-size:15px; padding:0 var(--space-3); min-height:40px;
+    border-radius:var(--radius-s); border:1px solid var(--border); width:160px;
+    background:var(--surface); color:var(--ink);
+  }
+  .noteRows { margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2); }
+  .noteRow {
+    display:flex; gap:var(--space-2); align-items:center; background:#f4f1fb;
+    border-radius:var(--radius-s); padding:var(--space-2) var(--space-3); flex-wrap:wrap;
+  }
+  .noteRow select { min-width:0; min-height:36px; padding:0 var(--space-2); font-size:14px; }
   .noteRow .rowNum { font-size:12px; color:var(--muted); width:20px; }
-  .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:4px; }
-  .noteRow .removeRow { margin-left:auto; background:#fff; color:var(--bad); border:1px solid var(--bad); padding:4px 9px; font-size:13px; }
-  .rowButtons { margin-top:10px; display:flex; gap:10px; }
-  .previewStaff { margin-top:14px; background:#fbfaf7; border-radius:10px; border:1px solid var(--line); }
-  .customList { margin-top:16px; }
-  .customSong { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--line); font-size:14px; }
+  .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:var(--space-1); }
+  .noteRow .removeRow { margin-left:auto; min-height:30px; padding:0 var(--space-3); background:#ffe0e6; color:var(--bad-text); font-size:13px; }
+  .rowButtons { margin-top:var(--space-3); display:flex; gap:var(--space-2); flex-wrap:wrap; }
+  .previewStaff { margin-top:var(--space-4); background:#fbfaf7; border-radius:var(--radius-m); border:1px solid var(--border); }
+  .customList { margin-top:var(--space-6); }
+  .customSong { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--border); font-size:14px; }
+  .deleteBtn { background:#ffe0e6; color:var(--bad-text); }
+
+  :focus-visible { outline:2px solid var(--accent-ring); outline-offset:2px; }
+
+  @media (max-width: 599.98px) {
+    .controlGroups { flex-direction:column; }
+    .controlGroup, .groupRow { width:100%; }
+    .groupRow { flex-direction:column; align-items:stretch; }
+    select, button, .soundToggle, input[type="text"] { width:100%; }
+    .pill { align-self:stretch; justify-content:center; }
+    .searchRow { flex-direction:row; }
+    .searchRow input { width:auto; }
+    .searchRow button { width:auto; flex:0 0 auto; }
+    .formRow input { width:100%; }
+  }
 </style>
 </head>
 <body>
@@ -62,36 +157,79 @@
   <p class="sub">Oefen zonder tijd, of speel af mee met de balk. De microfoon luistert naar je piano.</p>
 
   <div class="stats">
-    <div class="stat"><b id="xp">0</b><span>XP</span></div>
-    <div class="stat"><b id="streak">0</b><span>Reeks</span></div>
-    <div class="stat"><b id="stars">0</b><span>Sterren</span></div>
+    <div class="stat stat-xp"><span class="statIcon" aria-hidden="true">⚡</span><b id="xp">0</b><span class="statLabel">XP</span></div>
+    <div class="stat stat-streak"><span class="statIcon" aria-hidden="true">🔥</span><b id="streak">0</b><span class="statLabel">Reeks</span></div>
+    <div class="stat stat-stars"><span class="statIcon" aria-hidden="true">⭐</span><b id="stars">0</b><span class="statLabel">Sterren</span></div>
   </div>
 
   <div class="card">
-    <svg id="staff" viewBox="0 0 600 240"></svg>
+    <div class="staffWrap">
+      <svg id="staff" viewBox="0 0 600 240"></svg>
+    </div>
+    <p class="scrollHint" id="scrollHint" hidden>↔ Sleep opzij om het hele stuk te zien</p>
     <div class="progress"><div id="bar"></div></div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
     <div class="legend">
-      <i style="background:#e8832a"></i>C-noten &nbsp;
-      <i style="background:#333"></i>overige noten &nbsp;
+      <i style="background:#ec8f4c"></i>C-noten &nbsp;
+      <i style="background:#2b2640"></i>overige noten &nbsp;
       R1 t/m R5 = rechter hand, vinger 1 t/m 5
     </div>
-    <div class="controls">
-      <select id="song"></select>
-      <button id="micBtn">Microfoon aan</button>
-      <button id="calibBtn">Stem af op C</button>
-      <button id="playBtn">Speel af</button>
-      <button id="restart">Opnieuw</button>
-      <label class="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
-      <span class="heard" id="heard">Gehoord: -</span>
-      <span class="heard" id="calibInfo"></span>
+    <div class="legend">
+      <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
+      <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
+    </div>
+
+    <div class="controlGroups">
+      <div class="controlGroup">
+        <span class="groupLabel">Lied</span>
+        <select id="song"></select>
+      </div>
+
+      <div class="controlGroup">
+        <span class="groupLabel">Niveau</span>
+        <select id="difficulty">
+          <option value="beginner">Beginner</option>
+          <option value="medior" selected>Medior</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+
+      <div class="controlGroup">
+        <span class="groupLabel">Microfoon</span>
+        <div class="groupRow">
+          <button id="micBtn">Microfoon aan</button>
+          <button id="calibBtn">Stem af op C</button>
+        </div>
+        <div class="groupRow">
+          <span class="pill" id="heard">Gehoord: -</span>
+          <span class="pill" id="calibInfo"></span>
+        </div>
+      </div>
+
+      <div class="controlGroup">
+        <span class="groupLabel">Afspelen</span>
+        <div class="groupRow">
+          <button id="playBtn">Speel af</button>
+          <button id="restart" class="btn-ghost">Opnieuw</button>
+          <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="warn" id="draftWarn" hidden></div>
 
+  <div class="card searchCard">
+    <h2>Zoek klassieke stukken</h2>
+    <p class="sub">Zoek een componist of titel op in IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. De zoekresultaten openen in een nieuw tabblad. Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
+    <div class="groupRow searchRow">
+      <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin nocturne">
+      <button id="musicSearchBtn">Zoek op IMSLP</button>
+    </div>
+  </div>
+
   <div class="card addCard">
-    <button id="addToggle" class="ghostBtn" type="button">+ Lied toevoegen (vanaf foto of pdf)</button>
+    <button id="addToggle" class="btn-ghost" type="button">+ Lied toevoegen (vanaf foto of pdf)</button>
     <div id="addPanel" hidden>
       <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
 
@@ -108,15 +246,15 @@
 
       <div id="noteRows" class="noteRows"></div>
       <div class="rowButtons">
-        <button id="addNoteBtn" class="ghostBtn" type="button">+ Noot</button>
-        <button id="addRestBtn" class="ghostBtn" type="button">+ Rust</button>
+        <button id="addNoteBtn" class="btn-ghost" type="button">+ Noot</button>
+        <button id="addRestBtn" class="btn-ghost" type="button">+ Rust</button>
       </div>
 
       <svg id="previewStaff" viewBox="0 0 600 240" class="previewStaff"></svg>
 
-      <div class="controls">
+      <div class="groupRow">
         <button id="saveSongBtn" type="button">Lied opslaan</button>
-        <span class="heard" id="addFeedback"></span>
+        <span class="pill" id="addFeedback"></span>
       </div>
     </div>
 
@@ -188,7 +326,17 @@ const SONGS = [
 
 // ---------- Constanten voor timing ----------
 const COUNT_IN = 4;   // tellen voordat de balk start (in tellen)
-const WINDOW   = 0.5; // acceptatievenster rond een noot, in tellen
+
+// ---------- Niveaus: speling in timing en toonhoogte ----------
+// window: hoe ver je naast de tel mag zitten en de noot telt nog (in tellen).
+// perfectWindow: hoe dicht bij de tel voor de volle timingbonus.
+// octaveStrict: true betekent dat alleen de exacte octaaf telt, niet elke octaaf van dezelfde toon.
+const DIFFICULTIES = {
+  beginner: { label: 'Beginner', window: 0.75, perfectWindow: 0.35, octaveStrict: false },
+  medior:   { label: 'Medior',   window: 0.5,  perfectWindow: 0.15, octaveStrict: false },
+  advanced: { label: 'Advanced', window: 0.25, perfectWindow: 0.08, octaveStrict: true }
+};
+let difficulty = DIFFICULTIES.medior;
 
 // ---------- Notenhulpjes ----------
 const LETTERS = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
@@ -238,7 +386,7 @@ let song = SONGS[0];
 let notes = [];
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
-let phRect = null;
+let phRect = null, liveMarker = null, liveLabel = null;
 
 function loadSong(s) {
   stopPlay(false);
@@ -289,15 +437,17 @@ function updateStats() {
 function render() {
   staff.innerHTML = '';
   // Bij langere liedjes passen niet alle noten op een balk van 600 breed: de
-  // viewBox wordt dan breder, zodat alles zichtbaar blijft (en wat kleiner wordt).
+  // viewBox (en de minimumbreedte) wordt dan groter, zodat de noten leesbaar
+  // blijven. De staffWrap eromheen zorgt dan voor horizontaal scrollen.
   const svgWidth = Math.max(600, xOf(Math.max(notes.length - 1, 0)) + 60);
   staff.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' });
+  staff.style.minWidth = svgWidth + 'px';
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' });
   clef.textContent = '\u{1D11E}';
 
   // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#dc2626', opacity:0 });
+  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#e0496a', opacity:0 });
 
   // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
   // zodat het ook klopt bij noten die niet allemaal even lang duren.
@@ -307,13 +457,13 @@ function render() {
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
     if (i > 0 && measureIdx > lastMeasure) {
       const x = xOf(i) - 17;
-      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 });
+      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 });
     }
     lastMeasure = measureIdx;
   });
   if (notes.length) {
     const xEnd = xOf(notes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 });
+    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 });
   }
 
   // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
@@ -323,12 +473,12 @@ function render() {
     if (step < 30) {
       for (let s = 28; s >= step; s -= 2) {
         const ly = yOf(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#333', 'stroke-width':1.5 });
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 });
       }
     } else if (step > 38) {
       for (let s = 40; s <= step; s += 2) {
         const ly = yOf(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#333', 'stroke-width':1.5 });
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 });
       }
     }
   }
@@ -339,17 +489,17 @@ function render() {
     const opacity = done ? 1 : 0.45;
 
     if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#333', opacity });
+      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity });
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
 
     const y = yOf(n.step);
     const isC = n.letter === 'C';
-    const fill = isC ? '#e8832a' : '#333';
+    const fill = isC ? '#ec8f4c' : '#2b2640';
     const current = i === idx;
     const noteOpacity = (done || current) ? 1 : 0.45;
-    const highlight = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
+    const highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
     const dur = n.dur || 1;
     const hollow = dur >= 2;
 
@@ -378,6 +528,20 @@ function render() {
   label.textContent = idx < notes.length
     ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
     : 'Klaar!';
+
+  // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.
+  liveMarker = el('circle', { cx:0, cy:0, r:6, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5, opacity:0 });
+  liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
+
+  updateScrollHint();
+}
+
+// Toont alleen een hint als de notenbalk breder is dan wat er past.
+function updateScrollHint() {
+  const wrap = document.querySelector('.staffWrap');
+  const hint = document.getElementById('scrollHint');
+  if (!wrap || !hint) return;
+  hint.hidden = wrap.scrollWidth <= wrap.clientWidth + 1;
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
@@ -387,17 +551,21 @@ function onHeard(midi, tEvent) {
   const target = notes[idx];
   const diff = midi - target.midi;
   const samePitchClass = ((diff % 12) + 12) % 12 === 0;
+  const exactOctave = diff === 0;
+  // Bij "advanced" telt alleen de exacte octaaf, niet elke octaaf van dezelfde toon.
+  const pitchOk = difficulty.octaveStrict ? exactOctave : samePitchClass;
 
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
-    if (samePitchClass) {
-      const bonus = diff === 0 ? 10 : 6;
-      xp += bonus;
+    if (pitchOk) {
+      const pitchPts = exactOctave ? 10 : 6;
+      xp += pitchPts;
       streak++;
-      if (streak >= 5) xp += 5;
+      let streakNote = '';
+      if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
       idx++;
       skipRests();
-      setFeedback(`Goed! +${bonus} XP${diff === 0 ? '' : ' (andere octaaf telt ook)'}`, 'ok');
+      setFeedback(`Goed! +${pitchPts} toon${exactOctave ? '' : ' (andere octaaf telt ook)'}${streakNote}`, 'ok');
       if (idx === notes.length) finish();
       else render();
     } else {
@@ -409,15 +577,16 @@ function onHeard(midi, tEvent) {
     return;
   }
 
-  // Speel af: noot telt alleen binnen het venster rond de balk.
+  // Speel af: noot telt alleen binnen het venster rond de balk. De breedte van
+  // dat venster hangt af van het gekozen niveau.
   const t = (tEvent - startT) / beatMs - COUNT_IN;
-  if (t < target.start - WINDOW) {
+  if (t < target.start - difficulty.window) {
     setFeedback(`Te vroeg. Wacht tot de balk bij ${target.label} is.`, 'bad');
     return;
   }
-  if (t > target.start + WINDOW) return; // wordt door tick als gemist gemarkeerd
+  if (t > target.start + difficulty.window) return; // wordt door tick als gemist gemarkeerd
 
-  if (!samePitchClass) {
+  if (!pitchOk) {
     wrongs++;
     streak = 0;
     setFeedback(`Verkeerde noot: je speelde ${midiToLabel(midi)}, nu is ${target.label} met R${target.finger} aan de beurt`, 'bad');
@@ -426,15 +595,17 @@ function onHeard(midi, tEvent) {
   }
 
   const off = t - target.start;
-  const perfect = Math.abs(off) <= 0.15;
-  const bonus = (diff === 0 ? 10 : 6) + (perfect ? 5 : 0);
-  xp += bonus;
+  const perfect = Math.abs(off) <= difficulty.perfectWindow;
+  const pitchPts = exactOctave ? 10 : 6;
+  const timingPts = perfect ? 5 : 0;
+  xp += pitchPts + timingPts;
   streak++;
-  if (streak >= 5) xp += 5;
+  let streakNote = '';
+  if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
   idx++;
   skipRests();
   const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
-  setFeedback(`${timing}! +${bonus} XP`, 'ok');
+  setFeedback(`${timing}! +${pitchPts} toon${timingPts ? ` +${timingPts} timing` : ''}${streakNote}`, 'ok');
 
   if (idx === notes.length) stopPlay(true);
   else { render(); updateStats(); }
@@ -449,34 +620,89 @@ function finish() {
 }
 
 // ---------- Speel af: balk loopt over de noten ----------
-let scheduledOscillators = [];
+let scheduledSources = [];
+let noiseBuffer = null, noiseBufferCtx = null;
 
-// Benadering van een pianoklank: grondtoon plus een paar boventonen,
-// elk met een korte aanzet en een exponentieel wegstervende klank.
-// Geen echte pianosample, maar klinkt wel voller dan een kale sinustoon.
-const PIANO_HARMONICS = [
-  { mult: 1, level: 0.22 },
-  { mult: 2, level: 0.10 },
-  { mult: 3, level: 0.05 },
-  { mult: 4, level: 0.025 }
+// Benadering van een pianoklank, opgebouwd uit een paar pianospecifieke eigenschappen
+// in plaats van een kale sinustoon:
+// - boventonen liggen niet precies op een geheel veelvoud van de grondtoon (inharmoniciteit,
+//   sterker bij lage snaren) en sterven sneller uit dan de grondtoon, zodat de klank
+//   tijdens het wegsterven doffer wordt, net als bij een echte snaar;
+// - de grondtoon en eerste boventoon komen van twee licht verstemde oscillators (unisono-
+//   snaren), wat het typische zachte zweven van een piano geeft;
+// - een korte ruisimpuls bij de aanslag simuleert de tik van de hamer op de snaar.
+const PIANO_PARTIALS = [
+  { n: 1, level: 0.30, unison: true },
+  { n: 2, level: 0.20, unison: true },
+  { n: 3, level: 0.13, unison: false },
+  { n: 4, level: 0.085, unison: false },
+  { n: 5, level: 0.055, unison: false },
+  { n: 6, level: 0.035, unison: false },
+  { n: 7, level: 0.022, unison: false },
+  { n: 8, level: 0.014, unison: false }
 ];
+
+function getNoiseBuffer(ctx) {
+  if (noiseBuffer && noiseBufferCtx === ctx) return noiseBuffer;
+  const length = Math.floor(ctx.sampleRate * 0.05);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  noiseBuffer = buffer;
+  noiseBufferCtx = ctx;
+  return buffer;
+}
+
+function scheduleHammerNoise(when, freq) {
+  const src = audioCtx.createBufferSource();
+  src.buffer = getNoiseBuffer(audioCtx);
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = Math.min(freq * 2.5, 8000);
+  filter.Q.value = 0.7;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.05, when);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.02);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(when);
+  src.stop(when + 0.03);
+  scheduledSources.push(src);
+}
 
 function scheduleNoteSound(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
-  PIANO_HARMONICS.forEach(h => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = freq * h.mult;
-    gain.gain.setValueAtTime(0, when);
-    gain.gain.linearRampToValueAtTime(h.level, when + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start(when);
-    osc.stop(when + duration + 0.05);
-    scheduledOscillators.push(osc);
+  // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
+  const detuneCents = (Math.random() - 0.5) * 3;
+  // Dikkere, lage snaren zijn sterker inharmonisch dan dunne, hoge snaren.
+  const B = Math.min(0.004, Math.max(0.00005, 0.0009 * Math.pow(2, (48 - midi) / 12)));
+
+  PIANO_PARTIALS.forEach(p => {
+    const n = p.n;
+    const partialFreq = freq * n * Math.sqrt(1 + B * n * n) * Math.pow(2, detuneCents / 1200);
+    const decayTime = Math.max(0.15, duration / Math.sqrt(n));
+    const attack = 0.004 + 0.01 / n;
+    const voicesCents = p.unison ? [-4, 4] : [0];
+    voicesCents.forEach(cents => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = partialFreq * Math.pow(2, cents / 1200);
+      const level = p.level / voicesCents.length;
+      gain.gain.setValueAtTime(0, when);
+      gain.gain.linearRampToValueAtTime(level, when + attack);
+      gain.gain.exponentialRampToValueAtTime(level * 0.3, when + attack + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + attack + decayTime);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(when);
+      osc.stop(when + attack + decayTime + 0.05);
+      scheduledSources.push(osc);
+    });
   });
+
+  scheduleHammerNoise(when, freq);
 }
 
 function startPlay() {
@@ -516,7 +742,7 @@ function tick(now) {
     // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
     // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
     let missed = false;
-    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + WINDOW)) {
+    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + difficulty.window)) {
       if (notes[idx].rest) {
         idx++;
         continue;
@@ -541,8 +767,8 @@ function tick(now) {
 }
 
 function stopPlay(completed) {
-  scheduledOscillators.forEach(o => { try { o.stop(); } catch (e) {} });
-  scheduledOscillators = [];
+  scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledSources = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
   const was = playing;
@@ -699,6 +925,42 @@ function resetNoteDetection() {
   noteSilenceSince = 0;
 }
 
+// ---------- Live-indicator: toont wat de microfoon echt hoort, op de notenbalk ----------
+// Groen/teal = beide detectoren eens (betrouwbaar). Amber = maar één detector hoorde iets,
+// of ze zijn het oneens (onzeker, bijvoorbeeld door ruis of een octaaffout).
+function updateLiveMarker(f1, f2, midi) {
+  if (!liveMarker || !liveLabel) return;
+
+  let freq = null, confident = false;
+  if (midi !== null) { freq = f1; confident = true; }
+  else if (f1 || f2) { freq = f1 || f2; confident = false; }
+
+  if (!freq) {
+    liveMarker.setAttribute('opacity', 0);
+    liveLabel.setAttribute('opacity', 0);
+    return;
+  }
+
+  const rawMidi = Math.round(69 + 12 * Math.log2(freq / 440) - calibrationOffset);
+  const noteLabel = midiToLabel(rawMidi);
+  const step = parseNote(noteLabel).step;
+  const y = yOf(step);
+  const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
+  const x = xOf(atIdx) + 20;
+  const color = confident ? '#2dd4bf' : '#f5a623';
+
+  liveMarker.setAttribute('cx', x);
+  liveMarker.setAttribute('cy', y);
+  liveMarker.setAttribute('fill', color);
+  liveMarker.setAttribute('opacity', 1);
+
+  liveLabel.setAttribute('x', x);
+  liveLabel.setAttribute('y', y - 14);
+  liveLabel.setAttribute('fill', color);
+  liveLabel.textContent = noteLabel;
+  liveLabel.setAttribute('opacity', 1);
+}
+
 function listen() {
   if (!analyser) return;
   analyser.getFloatTimeDomainData(buf);
@@ -712,6 +974,7 @@ function listen() {
     midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
   }
   document.getElementById('heard').textContent = midi !== null ? `Gehoord: ${midiToLabel(midi)}` : 'Gehoord: -';
+  updateLiveMarker(f1, f2, midi);
 
   const now = performance.now();
 
@@ -759,6 +1022,7 @@ async function calibrate() {
       analyser.getFloatTimeDomainData(buf);
       const f = detectPitch(buf, audioCtx.sampleRate);
       if (f) samples.push(f);
+      updateLiveMarker(f, null, null);
       if (performance.now() - start > duration) {
         clearInterval(iv);
         resolve();
@@ -981,8 +1245,8 @@ function renderPreview() {
 
   const svgWidth = Math.max(600, xOf(noteNames.length - 1) + 60);
   svgEl.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }, svgEl));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' }, svgEl);
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
   clef.textContent = '\u{1D11E}';
 
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
@@ -1000,13 +1264,13 @@ function renderPreview() {
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
     if (i > 0 && measureIdx > lastMeasure) {
       const x = xOf(i) - 17;
-      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 }, svgEl);
+      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
     }
     lastMeasure = measureIdx;
   });
   if (parsed.length) {
     const xEnd = xOf(parsed.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 }, svgEl);
+    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
   }
 
   const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
@@ -1014,18 +1278,18 @@ function renderPreview() {
   parsed.forEach((n, i) => {
     const x = xOf(i);
     if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#333' }, svgEl);
+      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
       rest.textContent = '\u{1D13D}';
       return;
     }
     const y = yOf(n.step);
     const isC = n.letter === 'C';
-    const fill = isC ? '#e8832a' : '#333';
+    const fill = isC ? '#ec8f4c' : '#2b2640';
     const hollow = n.dur >= 2;
     if (n.step < 30) {
-      for (let s = 28; s >= n.step; s -= 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#333', 'stroke-width':1.5 }, svgEl);
+      for (let s = 28; s >= n.step; s -= 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
     } else if (n.step > 38) {
-      for (let s = 40; s <= n.step; s += 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#333', 'stroke-width':1.5 }, svgEl);
+      for (let s = 40; s <= n.step; s += 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
     }
     el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill: hollow ? '#fff' : fill, stroke: hollow ? fill : 'none', 'stroke-width':1.8 }, svgEl);
     el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, 'stroke-width':1.6 }, svgEl);
@@ -1043,11 +1307,11 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
   const { notes: noteNames, durations, fingers } = readNoteRows();
 
-  if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'heard bad'; return; }
-  if (!noteNames.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe.'; fb.className = 'heard bad'; return; }
+  if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'pill bad'; return; }
+  if (!noteNames.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe.'; fb.className = 'pill bad'; return; }
   for (const n of noteNames) {
     if (n !== null && !/^[A-G](#|b)?[3-6]$/.test(n)) {
-      fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'heard bad'; return;
+      fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'pill bad'; return;
     }
   }
 
@@ -1064,13 +1328,31 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   loadSong(newSong);
   renderCustomList();
   fb.textContent = `"${title}" opgeslagen en geladen.`;
-  fb.className = 'heard ok';
+  fb.className = 'pill ok';
 });
 
 document.getElementById('noteRows').appendChild(createNoteRow({}));
 renumberRows();
 renderPreview();
 renderCustomList();
+
+// ---------- Zoeken naar klassieke stukken op IMSLP (gratis, publiek domein) ----------
+// Geen eigen databank-oproep: Openopus en IMSLP sturen geen CORS-header mee, dus een
+// fetch vanuit de browser wordt altijd geblokkeerd. In plaats daarvan openen we de
+// IMSLP-zoekpagina zelf in een nieuw tabblad, dat is een gewone linknavigatie.
+// Noten voor SONGS worden hier nooit overgenomen: dat gebeurt alleen na controle tegen de partituur.
+function searchMusic(term) {
+  const url = `https://imslp.org/wiki/Special:Search?search=${encodeURIComponent(term)}&fulltext=Search`;
+  window.open(url, '_blank', 'noopener');
+}
+
+document.getElementById('musicSearchBtn').addEventListener('click', () => {
+  const term = document.getElementById('musicSearch').value.trim();
+  if (term) searchMusic(term);
+});
+document.getElementById('musicSearch').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('musicSearchBtn').click();
+});
 
 // ---------- Knoppen ----------
 const songSelect = document.getElementById('song');
@@ -1086,6 +1368,10 @@ function populateSongSelect() {
 populateSongSelect();
 songSelect.value = song.id;
 songSelect.addEventListener('change', () => loadSong(findSong(songSelect.value)));
+
+document.getElementById('difficulty').addEventListener('change', (e) => {
+  difficulty = DIFFICULTIES[e.target.value];
+});
 
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
@@ -1103,6 +1389,8 @@ document.getElementById('playBtn').addEventListener('click', async () => {
 document.getElementById('restart').addEventListener('click', () => {
   loadSong(song);
 });
+
+window.addEventListener('resize', updateScrollHint);
 
 loadSong(song);
 </script>
