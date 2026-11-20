@@ -32,6 +32,28 @@
   .legend { font-size:13px; color:var(--muted); margin-top:10px; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   .warn { font-size:13px; color:#8a5a00; background:#fff6e0; border-radius:10px; padding:10px 12px; margin-top:14px; }
+
+  .addCard { margin-top:16px; }
+  .ghostBtn { background:#fff; color:var(--accent); border:1.5px solid var(--accent); }
+  .deleteBtn { background:#fff; color:var(--bad); border:1.5px solid var(--bad); padding:6px 10px; font-size:13px; }
+  .fileLabel { display:block; font-size:13px; color:var(--muted); margin-top:14px; }
+  .fileLabel input { display:block; margin-top:6px; }
+  .refPreview { margin-top:10px; }
+  .refPreview img { max-width:100%; max-height:420px; border-radius:8px; border:1px solid var(--line); display:block; }
+  .refPreview embed { width:100%; height:420px; border-radius:8px; border:1px solid var(--line); }
+  .formRow { display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; }
+  .formRow label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .formRow input { font-size:15px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); width:140px; }
+  .noteRows { margin-top:14px; display:flex; flex-direction:column; gap:6px; }
+  .noteRow { display:flex; gap:6px; align-items:center; background:var(--bg); border-radius:8px; padding:6px 8px; flex-wrap:wrap; }
+  .noteRow select { padding:6px 8px; font-size:14px; }
+  .noteRow .rowNum { font-size:12px; color:var(--muted); width:20px; }
+  .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .noteRow .removeRow { margin-left:auto; background:#fff; color:var(--bad); border:1px solid var(--bad); padding:4px 9px; font-size:13px; }
+  .rowButtons { margin-top:10px; display:flex; gap:10px; }
+  .previewStaff { margin-top:14px; background:#fbfaf7; border-radius:10px; border:1px solid var(--line); }
+  .customList { margin-top:16px; }
+  .customSong { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--line); font-size:14px; }
 </style>
 </head>
 <body>
@@ -67,13 +89,49 @@
   </div>
 
   <div class="warn" id="draftWarn" hidden></div>
+
+  <div class="card addCard">
+    <button id="addToggle" class="ghostBtn" type="button">+ Lied toevoegen (vanaf foto of pdf)</button>
+    <div id="addPanel" hidden>
+      <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
+
+      <label class="fileLabel">Foto of pdf van de bladmuziek
+        <input type="file" id="refFile" accept="image/*,application/pdf">
+      </label>
+      <div id="refPreview" class="refPreview"></div>
+
+      <div class="formRow">
+        <label>Titel <input type="text" id="newTitle" placeholder="Titel van het lied"></label>
+        <label>Tempo (bpm) <input type="number" id="newBpm" value="100" min="30" max="240"></label>
+        <label>Tellen per maat <input type="number" id="newBeats" value="4" min="1" max="12"></label>
+      </div>
+
+      <div id="noteRows" class="noteRows"></div>
+      <div class="rowButtons">
+        <button id="addNoteBtn" class="ghostBtn" type="button">+ Noot</button>
+        <button id="addRestBtn" class="ghostBtn" type="button">+ Rust</button>
+      </div>
+
+      <svg id="previewStaff" viewBox="0 0 600 240" class="previewStaff"></svg>
+
+      <div class="controls">
+        <button id="saveSongBtn" type="button">Lied opslaan</button>
+        <span class="heard" id="addFeedback"></span>
+      </div>
+    </div>
+
+    <div id="customList" class="customList"></div>
+  </div>
 </main>
 
 <script>
 // ---------- Liederen (losse data, makkelijk aan te vullen) ----------
-// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf. Gebruik null voor een rust.
+// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf, "Bb4"/"F#4" voor mol/kruis.
+// Gebruik null voor een rust.
 // fingers: rechterhandvinger per noot (1 = duim, 5 = pink). null op een rust-plek.
-// bpm: tempo voor "Speel af". Elke noot of rust duurt hier één tel.
+// bpm: tempo voor "Speel af".
+// durations: optioneel, lengte per noot/rust in tellen (1 = kwart, 0.5 = achtste, 1.5 = kwart
+// gestippeld, enz.). Zonder durations duurt elke noot of rust één tel, zoals voorheen.
 // beatsPerMeasure: aantal tellen per maat, voor de maatstrepen in de notenbalk.
 // draft: true betekent dat de noten, vingerzetting en maatindeling nog niet zijn gecontroleerd.
 const SONGS = [
@@ -95,6 +153,36 @@ const SONGS = [
     draft: true,
     notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
     fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
+  },
+  {
+    id: 'sinterklaas-deur',
+    title: 'Sinterklaas: Daar wordt aan de deur geklopt (arr. Y vd Berg)',
+    bpm: 100,
+    beatsPerMeasure: 3,
+    draft: true,
+    // Overgetypt van een foto van de bladmuziek, alleen de rechterhand/melodie
+    // (geen baspartij, geen akkoorden: dat kan de app nog niet). Vingerzetting
+    // is alleen overgenomen waar de partituur een cijfer gaf; op de andere noten
+    // is dat cijfer aangehouden tot het volgende cijfer. Controleer tegen de
+    // partituur voordat je dit serieus oefent.
+    notes: [
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'A4','F4','F4',
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'F4',
+      'E4','A3','A3', 'F4','D4','D4', 'E4','A3','A3', 'F4','D4','D4',
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'F4'
+    ],
+    durations: [
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 1,1,1,
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 3,
+      1,1,1, 1,1,1, 1,1,1, 1,1,1,
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 3
+    ],
+    fingers: [
+      4,4,4,4, 4,4,4, 4,4,4, 1,1,1,
+      1,1,1,1, 4,4,4, 4,4,4, 4,
+      4,4,4, 5,5,5, 4,4,4, 5,5,5,
+      4,4,4,4, 4,4,4, 4,4,4, 4
+    ]
   }
 ];
 
@@ -109,10 +197,10 @@ const NAME_PC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 function parseNote(n) {
   const letter = n[0];
-  const accidental = n.length === 3 ? n[1] : '';
+  const accidental = n.length === 3 ? n[1] : ''; // '#' of 'b'
   const octave = parseInt(n[n.length - 1], 10);
   const base = (octave + 1) * 12 + SEMI[LETTERS[letter]];
-  const midi = base + (accidental === '#' ? 1 : 0);
+  const midi = base + (accidental === '#' ? 1 : accidental === 'b' ? -1 : 0);
   const step = octave * 7 + LETTERS[letter];
   return { midi, step, label: n, letter };
 }
@@ -132,6 +220,19 @@ function el(tag, attrs, parent = staff) {
 const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
 const xOf = i => 110 + i * 34;
 
+// X-positie van de speelstreep op tijdstip t (in tellen): de noten staan steeds
+// even ver uit elkaar op de balk, maar duren niet allemaal even lang, dus de
+// streep interpoleert tussen de huidige en de volgende noot naar rato van de tel.
+function xAtTime(t) {
+  if (!notes.length) return xOf(0);
+  let i = 0;
+  while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
+  const cur = notes[i];
+  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + 34;
+  const frac = cur.dur > 0 ? Math.min(1, Math.max(0, (t - cur.start) / cur.dur)) : 0;
+  return xOf(i) + frac * (nextX - xOf(i));
+}
+
 // ---------- Spelstatus ----------
 let song = SONGS[0];
 let notes = [];
@@ -144,9 +245,16 @@ function loadSong(s) {
   resetNoteDetection();
   song = s;
   beatMs = 60000 / s.bpm;
-  notes = s.notes.map((n, i) => n === null
-    ? { rest: true, start: i, label: 'rust', finger: null }
-    : { ...parseNote(n), rest: false, finger: s.fingers[i], start: i });
+  const durations = s.durations || s.notes.map(() => 1);
+  let cum = 0;
+  notes = s.notes.map((n, i) => {
+    const dur = durations[i];
+    const note = n === null
+      ? { rest: true, start: cum, dur, label: 'rust', finger: null }
+      : { ...parseNote(n), rest: false, finger: s.fingers[i], start: cum, dur };
+    cum += dur;
+    return note;
+  });
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   document.getElementById('title').textContent = s.title;
@@ -180,22 +288,49 @@ function updateStats() {
 
 function render() {
   staff.innerHTML = '';
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:590, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }));
+  // Bij langere liedjes passen niet alle noten op een balk van 600 breed: de
+  // viewBox wordt dan breder, zodat alles zichtbaar blijft (en wat kleiner wordt).
+  const svgWidth = Math.max(600, xOf(Math.max(notes.length - 1, 0)) + 60);
+  staff.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }));
   const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' });
   clef.textContent = '\u{1D11E}';
 
   // Speelstreep eerst tekenen, zodat de noten erboven liggen.
   phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#dc2626', opacity:0 });
 
-  // Maatstrepen: één per volle maat, plus een slotstreep aan het eind.
+  // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
+  // zodat het ook klopt bij noten die niet allemaal even lang duren.
   const beatsPerMeasure = song.beatsPerMeasure || 4;
-  for (let i = beatsPerMeasure; i < notes.length; i += beatsPerMeasure) {
-    const x = xOf(i) - 17;
-    el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 });
-  }
+  let lastMeasure = 0;
+  notes.forEach((n, i) => {
+    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
+    if (i > 0 && measureIdx > lastMeasure) {
+      const x = xOf(i) - 17;
+      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 });
+    }
+    lastMeasure = measureIdx;
+  });
   if (notes.length) {
     const xEnd = xOf(notes.length - 1) + 17;
     el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 });
+  }
+
+  // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
+  const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
+
+  function ledgerLines(x, step) {
+    if (step < 30) {
+      for (let s = 28; s >= step; s -= 2) {
+        const ly = yOf(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#333', 'stroke-width':1.5 });
+      }
+    } else if (step > 38) {
+      for (let s = 40; s <= step; s += 2) {
+        const ly = yOf(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#333', 'stroke-width':1.5 });
+      }
+    }
   }
 
   notes.forEach((n, i) => {
@@ -214,11 +349,26 @@ function render() {
     const fill = isC ? '#e8832a' : '#333';
     const current = i === idx;
     const noteOpacity = (done || current) ? 1 : 0.45;
-    const stroke = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
+    const highlight = done ? '#2e9e5b' : current ? '#3b6fd4' : 'none';
+    const dur = n.dur || 1;
+    const hollow = dur >= 2;
 
-    if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#333', 'stroke-width':1.5 });
-    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity: noteOpacity, stroke, 'stroke-width':2.5 });
+    ledgerLines(x, n.step);
+    el('ellipse', {
+      cx:x, cy:y, rx:8, ry:6,
+      fill: hollow ? '#fff' : fill,
+      opacity: noteOpacity,
+      stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
+      'stroke-width': highlight !== 'none' ? 2.5 : 1.8
+    });
     el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 });
+    if (dur < 1) {
+      // Vlaggetje voor een achtste noot.
+      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity });
+    }
+    if (isDotted(dur)) {
+      el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity });
+    }
 
     const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity });
     finger.textContent = 'R' + n.finger;
@@ -347,7 +497,7 @@ function startPlay() {
     const audioStart = audioCtx.currentTime;
     notes.forEach(n => {
       if (n.rest) return;
-      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, beatSec * 0.8);
+      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
     });
   }
 
@@ -384,8 +534,7 @@ function tick(now) {
       stopPlay(true);
       return;
     }
-    const x = xOf(0) + t * 34 - 1.5;
-    phRect.setAttribute('x', x);
+    phRect.setAttribute('x', xAtTime(t) - 1.5);
     phRect.setAttribute('opacity', 1);
   }
   rafId = requestAnimationFrame(tick);
@@ -643,15 +792,300 @@ async function calibrate() {
   setFeedback('Gekalibreerd op jouw piano. Je kunt verder oefenen.', 'ok');
 }
 
+// ---------- Zelf toegevoegde liedjes (opgeslagen in de browser) ----------
+const CUSTOM_SONGS_KEY = 'pianoCustomSongs';
+
+function loadCustomSongs() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SONGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveCustomSongs(list) {
+  try { localStorage.setItem(CUSTOM_SONGS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+let customSongs = loadCustomSongs();
+function allSongs() { return SONGS.concat(customSongs); }
+function findSong(id) { return allSongs().find(s => s.id === id); }
+
+function renderCustomList() {
+  const wrap = document.getElementById('customList');
+  wrap.innerHTML = '';
+  if (!customSongs.length) return;
+  const heading = document.createElement('div');
+  heading.className = 'sub';
+  heading.style.marginTop = '16px';
+  heading.textContent = 'Zelf toegevoegde liedjes:';
+  wrap.appendChild(heading);
+  customSongs.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'customSong';
+    const label = document.createElement('span');
+    label.textContent = s.title;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'deleteBtn';
+    del.textContent = 'Verwijderen';
+    del.addEventListener('click', () => {
+      if (!confirm(`"${s.title}" verwijderen?`)) return;
+      customSongs = customSongs.filter(x => x.id !== s.id);
+      saveCustomSongs(customSongs);
+      const wasSelected = song.id === s.id;
+      populateSongSelect();
+      if (wasSelected) {
+        songSelect.value = SONGS[0].id;
+        loadSong(SONGS[0]);
+      }
+      renderCustomList();
+    });
+    row.appendChild(label);
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+}
+
+// ---------- Lied toevoegen: foto/pdf als hulpmiddel, noten met de hand invullen ----------
+document.getElementById('addToggle').addEventListener('click', () => {
+  document.getElementById('addPanel').hidden = !document.getElementById('addPanel').hidden;
+});
+
+document.getElementById('refFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  const wrap = document.getElementById('refPreview');
+  wrap.innerHTML = '';
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  if (file.type === 'application/pdf') {
+    const embed = document.createElement('embed');
+    embed.src = url;
+    embed.type = 'application/pdf';
+    wrap.appendChild(embed);
+  } else {
+    const img = document.createElement('img');
+    img.src = url;
+    wrap.appendChild(img);
+  }
+});
+
+const LETTERS_ORDER = ['C','D','E','F','G','A','B'];
+const ACCIDENTALS = [['', 'geen'], ['#', '#'], ['b', 'b']];
+const DURATIONS = [[0.5,'1/8 noot'],[1,'1/4 noot'],[1.5,'1/4 noot gestippeld'],[2,'1/2 noot'],[3,'1/2 noot gestippeld'],[4,'hele noot']];
+
+function selectEl(className, options, selected, labelFn) {
+  const sel = document.createElement('select');
+  sel.className = className;
+  options.forEach(opt => {
+    const [value, label] = Array.isArray(opt) ? opt : [opt, labelFn ? labelFn(opt) : opt];
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    if (String(value) === String(selected)) o.selected = true;
+    sel.appendChild(o);
+  });
+  return sel;
+}
+
+function createNoteRow(opts = {}) {
+  const row = document.createElement('div');
+  row.className = 'noteRow';
+
+  const num = document.createElement('span');
+  num.className = 'rowNum';
+  row.appendChild(num);
+
+  const restLabel = document.createElement('label');
+  restLabel.className = 'restLabel';
+  const restCb = document.createElement('input');
+  restCb.type = 'checkbox';
+  restCb.className = 'restCb';
+  restCb.checked = !!opts.rest;
+  restLabel.appendChild(restCb);
+  restLabel.appendChild(document.createTextNode('rust'));
+  row.appendChild(restLabel);
+
+  const letterSel = selectEl('letterSel', LETTERS_ORDER, opts.letter || 'C');
+  const accSel = selectEl('accSel', ACCIDENTALS, opts.accidental || '');
+  const octSel = selectEl('octSel', [3,4,5,6], opts.octave || 4);
+  const durSel = selectEl('durSel', DURATIONS, opts.dur || 1);
+  const fingerSel = selectEl('fingerSel', [1,2,3,4,5].map(f => [f, 'R' + f]), opts.finger || 1);
+  [letterSel, accSel, octSel, durSel, fingerSel].forEach(s => row.appendChild(s));
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'removeRow';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => { row.remove(); renumberRows(); renderPreview(); });
+  row.appendChild(removeBtn);
+
+  function applyRestState() {
+    const isRest = restCb.checked;
+    letterSel.disabled = isRest;
+    accSel.disabled = isRest;
+    octSel.disabled = isRest;
+    fingerSel.disabled = isRest;
+  }
+  applyRestState();
+  [restCb, letterSel, accSel, octSel, durSel, fingerSel].forEach(inp => {
+    inp.addEventListener('change', () => { applyRestState(); renderPreview(); });
+  });
+
+  return row;
+}
+
+function renumberRows() {
+  document.querySelectorAll('#noteRows .noteRow').forEach((row, i) => {
+    row.querySelector('.rowNum').textContent = (i + 1) + '.';
+  });
+}
+
+document.getElementById('addNoteBtn').addEventListener('click', () => {
+  document.getElementById('noteRows').appendChild(createNoteRow({}));
+  renumberRows();
+  renderPreview();
+});
+document.getElementById('addRestBtn').addEventListener('click', () => {
+  document.getElementById('noteRows').appendChild(createNoteRow({ rest: true }));
+  renumberRows();
+  renderPreview();
+});
+document.getElementById('newBeats').addEventListener('change', renderPreview);
+
+function readNoteRows() {
+  const rows = [...document.querySelectorAll('#noteRows .noteRow')];
+  const notesOut = [], durationsOut = [], fingersOut = [];
+  rows.forEach(row => {
+    const dur = parseFloat(row.querySelector('.durSel').value);
+    durationsOut.push(dur);
+    if (row.querySelector('.restCb').checked) {
+      notesOut.push(null);
+      fingersOut.push(null);
+    } else {
+      const letter = row.querySelector('.letterSel').value;
+      const acc = row.querySelector('.accSel').value;
+      const oct = row.querySelector('.octSel').value;
+      notesOut.push(letter + acc + oct);
+      fingersOut.push(parseInt(row.querySelector('.fingerSel').value, 10));
+    }
+  });
+  return { notes: notesOut, durations: durationsOut, fingers: fingersOut };
+}
+
+// Zelfstandige tekenfunctie voor het voorbeeld-notenbalkje: gebruikt dezelfde
+// el()/parseNote()/xOf()/yOf() hulpjes als de echte notenbalk, maar zonder
+// voortgangsstatus (geen "gespeeld"/"huidig").
+function renderPreview() {
+  const svgEl = document.getElementById('previewStaff');
+  svgEl.innerHTML = '';
+  const { notes: noteNames, durations, fingers } = readNoteRows();
+  if (!noteNames.length) return;
+
+  const svgWidth = Math.max(600, xOf(noteNames.length - 1) + 60);
+  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#333', 'stroke-width':1.5 }, svgEl));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' }, svgEl);
+  clef.textContent = '\u{1D11E}';
+
+  const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  let cum = 0, lastMeasure = 0;
+  const parsed = noteNames.map((n, i) => {
+    const dur = durations[i];
+    const note = n === null
+      ? { rest:true, start:cum, dur }
+      : { ...parseNote(n), rest:false, finger:fingers[i], start:cum, dur };
+    cum += dur;
+    return note;
+  });
+
+  parsed.forEach((n, i) => {
+    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
+    if (i > 0 && measureIdx > lastMeasure) {
+      const x = xOf(i) - 17;
+      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#333', 'stroke-width':1.5 }, svgEl);
+    }
+    lastMeasure = measureIdx;
+  });
+  if (parsed.length) {
+    const xEnd = xOf(parsed.length - 1) + 17;
+    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#333', 'stroke-width':2.5 }, svgEl);
+  }
+
+  const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
+
+  parsed.forEach((n, i) => {
+    const x = xOf(i);
+    if (n.rest) {
+      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#333' }, svgEl);
+      rest.textContent = '\u{1D13D}';
+      return;
+    }
+    const y = yOf(n.step);
+    const isC = n.letter === 'C';
+    const fill = isC ? '#e8832a' : '#333';
+    const hollow = n.dur >= 2;
+    if (n.step < 30) {
+      for (let s = 28; s >= n.step; s -= 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#333', 'stroke-width':1.5 }, svgEl);
+    } else if (n.step > 38) {
+      for (let s = 40; s <= n.step; s += 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#333', 'stroke-width':1.5 }, svgEl);
+    }
+    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill: hollow ? '#fff' : fill, stroke: hollow ? fill : 'none', 'stroke-width':1.8 }, svgEl);
+    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, 'stroke-width':1.6 }, svgEl);
+    if (n.dur < 1) el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill }, svgEl);
+    if (isDotted(n.dur)) el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill }, svgEl);
+    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555' }, svgEl);
+    finger.textContent = 'R' + n.finger;
+  });
+}
+
+document.getElementById('saveSongBtn').addEventListener('click', () => {
+  const fb = document.getElementById('addFeedback');
+  const title = document.getElementById('newTitle').value.trim();
+  const bpm = parseFloat(document.getElementById('newBpm').value) || 100;
+  const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  const { notes: noteNames, durations, fingers } = readNoteRows();
+
+  if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'heard bad'; return; }
+  if (!noteNames.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe.'; fb.className = 'heard bad'; return; }
+  for (const n of noteNames) {
+    if (n !== null && !/^[A-G](#|b)?[3-6]$/.test(n)) {
+      fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'heard bad'; return;
+    }
+  }
+
+  const newSong = {
+    id: 'custom-' + Date.now(),
+    title, bpm, beatsPerMeasure,
+    draft: true, custom: true,
+    notes: noteNames, durations, fingers
+  };
+  customSongs.push(newSong);
+  saveCustomSongs(customSongs);
+  populateSongSelect();
+  songSelect.value = newSong.id;
+  loadSong(newSong);
+  renderCustomList();
+  fb.textContent = `"${title}" opgeslagen en geladen.`;
+  fb.className = 'heard ok';
+});
+
+document.getElementById('noteRows').appendChild(createNoteRow({}));
+renumberRows();
+renderPreview();
+renderCustomList();
+
 // ---------- Knoppen ----------
 const songSelect = document.getElementById('song');
-SONGS.forEach((s, i) => {
-  const o = document.createElement('option');
-  o.value = i;
-  o.textContent = s.title;
-  songSelect.appendChild(o);
-});
-songSelect.addEventListener('change', () => loadSong(SONGS[songSelect.value]));
+function populateSongSelect() {
+  songSelect.innerHTML = '';
+  allSongs().forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.custom ? s.title + ' (zelf gemaakt)' : s.title;
+    songSelect.appendChild(o);
+  });
+}
+populateSongSelect();
+songSelect.value = song.id;
+songSelect.addEventListener('change', () => loadSong(findSong(songSelect.value)));
 
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
