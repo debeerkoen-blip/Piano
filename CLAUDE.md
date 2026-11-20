@@ -84,6 +84,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   render()/drawGrandStaff (die tekenen de hele notenbalk steeds opnieuw): de animatie wordt
   apart getriggerd, meteen na het herteken, op precies de noot die net geraakt is.
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
+- Geen voortgangsbalk en geen "Klaar! ★★★"-melding meer onder de notenbalk. In plaats daarvan
+  een pianotoetsenbord (88 toetsen, A0 t/m C8, `renderKeyboard()`) dat precies laat zien welke
+  toets en welke vinger nu aan de beurt is (de rechterhand, zoals ook op de notenbalk): de
+  huidige toets licht paars op met de vingerzetting erop, net als de "huidige noot"-markering
+  op de notenbalk. Scrollt automatisch mee zodat de huidige toets gecentreerd in beeld blijft.
+  Geen highlight meer zodra het lied klaar is (`idx >= notes.length`). XP/reeks/sterren tellen
+  nog gewoon door, alleen de tekstmelding bij het afronden is weg.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
