@@ -550,13 +550,139 @@ const SONGS = [
   },
   {
     id: 'gymno',
-    title: 'Gymnopédie nr. 1 (Satie), eerste frase',
-    bpm: 60,
-    // Maatsoort nog niet tegen de partituur gecontroleerd, zie draft-waarschuwing.
-    beatsPerMeasure: 4,
+    title: 'Gymnopédie nr. 1 (Satie)',
+    bpm: 52,
+    beatsPerMeasure: 3,
     draft: true,
-    notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
-    fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
+    // Overgetypt van drie foto's van een MuseScore-weergave (D-majeur, 2 kruizen,
+    // 3/4, "Lent et douloureux"), maat 1 t/m 78 (hele stuk, eindigt op de dubbele
+    // maatstreep). Dit is een beste-poging transcriptie, geen zekere bron:
+    // - De linkerhand is in de bron op elke tel 1 een akkoord (kwartrust + akkoord
+    //   dat de rest van de maat klinkt), op een lage baston daaronder. De app kent
+    //   geen akkoorden, dus is per maat teruggebracht tot die ene baston (de noot
+    //   op de hulplijn onder de notenbalk), als gestippelde halve noot.
+    // - Het siertje (een "turn") boven maat 26 en 31 is niet in de noten verwerkt.
+    // - Of sommige groepjes van 3 noten achtste noten of kwartnoten zijn kon niet
+    //   met zekerheid uit de foto's afgelezen worden; hier als kwartnoten genomen.
+    // - Vingerzetting staat nergens in de bron en is hier zelf bedacht, niet
+    //   gecontroleerd.
+    // Onzeker (controleer tegen IMSLP voor dit serieus geoefend wordt):
+    // - Herstel- en kruistekens rond maat 22-24, 27-29, 31-32, 52-54, 61-63,
+    //   66-68 en 71-76: de app houdt een herstelteken alleen binnen de maat aan
+    //   (notatieregel), maar of de precieze noten C/F zijn (en niet een andere
+    //   toonhoogte) kon niet op de pixel af gecontroleerd worden.
+    // - Maat 37-39: de bron laat hier een paar samengebalkte/akkoordachtige
+    //   notenkoppen in de rechterhand zien; vereenvoudigd tot één melodienoot
+    //   per maat.
+    // - Maat 65 en 70: notenwaarde (halve vs. gestippelde halve noot) onzeker,
+    //   hier als gestippelde halve genomen.
+    // - Alle baston-toonhoogtes in de linkerhand: afgelezen op hulplijnen onder de
+    //   bassleutel, lastig op de foto; harmonische richting (G/D/A versus C/F bij
+    //   de herstelteken-maten) is aannemelijk maar niet zeker.
+    notes: [
+      // m1-5
+      null,null,null,null,  null,'F#5','A5',
+      // m6-10
+      'B5','A5','G5',  'F#5','E5','D5',  'E5',  'F#5',  'D5',
+      // m11-15
+      'D5',  'D5',  null,'E5','F#5',  'G5','F#5','E5',  'D5','C#5','B4',
+      // m16-20
+      'A4',  'B4',  'C#5',  'D5',  'D5',
+      // m21-25
+      'D5',  'C5','B4','A4',  'G4','F4','E4',  'D4','E4','F#4',  'G4',
+      // m26-30
+      'A4',  'B4','A4','F4',  'G4','F4','E4',  'D4','C4','B3',  'A3',
+      // m31-35
+      'B3',  'C4',  'D4','E4','F#4',  'G4','F#4','E4',  'D4',
+      // m36-40
+      'E4','F#4','G4',  'A4','B4','C5',  'D5',  'C5',  null,
+      // m41-45
+      null,null,null,  null,'D5','F#5',  'G5','F#5','E5',
+      // m46-51
+      'D5','C#5','B4',  'A4',  'B4',  'B4',  'B4',  'B4',
+      // m52-56
+      null,'C5','D5',  'E5','D5','C5',  'B4','A4','G4',  'F#4',  'G4',
+      // m57-62
+      'A4',  'A4',  'A4',  'A4',  'B4','C5','D5',  'E5','F5','G5',
+      // m63-67
+      'A5','G5','F5',  'E5',  'E5',  'D5','C5','B4',  'A4','B4','C5',
+      // m68-73
+      'D5','C5','B4',  'A4',  'G4',  'A4',  'B4',  'C5','B4','A4',
+      // m74-78
+      'G4','F4','E4',  'D4','C4','B3',  'C4',  'D4',  'D4'
+    ],
+    durations: [
+      3,3,3,3,  1,1,1,
+      1,1,1,  1,1,1,  3,  3,  3,
+      3,  3,  1,1,1,  1,1,1,  1,1,1,
+      3,  3,  3,  3,  3,
+      3,  1,1,1,  1,1,1,  1,1,1,  3,
+      3,  1,1,1,  1,1,1,  1,1,1,  3,
+      3,  3,  1,1,1,  1,1,1,  3,
+      1,1,1,  1,1,1,  3,  3,  3,
+      3,3,3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  3,  3,  3,
+      1,1,1,  1,1,1,  1,1,1,  3,  3,
+      3,  3,  3,  3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  1,1,1,  1,1,1,
+      1,1,1,  3,  3,  3,  3,  1,1,1,
+      1,1,1,  1,1,1,  3,  3,  3
+    ],
+    fingers: [
+      null,null,null,null,  null,2,4,
+      3,2,1,  3,2,1,  3,  3,  3,
+      3,  3,  null,2,3,  3,2,1,  3,2,1,
+      3,  3,  3,  3,  3,
+      3,  3,2,1,  3,2,1,  1,2,3,  3,
+      3,  3,2,1,  3,2,1,  3,2,1,  3,
+      3,  3,  1,2,3,  3,2,1,  3,
+      1,2,3,  1,2,3,  3,  3,  null,
+      null,null,null,  null,2,3,  3,2,1,
+      3,2,1,  3,  3,  3,  3,  3,
+      null,2,3,  3,2,1,  3,2,1,  3,  3,
+      3,  3,  3,  3,  1,2,3,  1,2,3,
+      3,2,1,  3,  3,  3,2,1,  1,2,3,
+      3,2,1,  3,  3,  3,  3,  3,2,1,
+      3,2,1,  3,2,1,  3,  3,  3
+    ],
+    // Linkerhand: per maat de baston (zie uitleg hierboven). Klinkt mee bij
+    // "Speel af" met geluid aan; wordt (nog) niet beoordeeld door de microfoon.
+    left: {
+      notes: [
+        'G2','G2','G2','G2','G2',
+        'D3','A2','D3','G2','D3',
+        'G2','D3','G2','D3','A2',
+        'D3','G2','D3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'G2','C3','F2','C3','F2',
+        'G2','C3','G2','D3','G2',
+        'D3','G2','D3','C3','F2',
+        'G2','D3','G2','D3','G2',
+        'D3','G2','D3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'G2','D3','G2','D3','G2',
+        'C3','F2','C3','F2','G2',
+        'C3','F2','C3','G2','D3',
+        'G2','C3','F2','C3','F2',
+        'C3','G2','D3'
+      ],
+      durations: [
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3,3,3, 3,3,3,3,3, 3,3,3,3,3,
+        3,3,3
+      ],
+      fingers: [
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5,5,5, 5,5,5,5,5, 5,5,5,5,5,
+        5,5,5
+      ]
+    }
   },
   {
     id: 'sinterklaas-deur',
