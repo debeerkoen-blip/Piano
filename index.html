@@ -254,6 +254,7 @@
   @media (max-width: 599.98px) {
     .groupRow { flex-direction:column; align-items:stretch; }
     select, button:not(.icon-btn), .soundToggle, input[type="text"] { width:100%; }
+    input[type="range"] { width:100%; }
     .pill { align-self:stretch; justify-content:center; }
     .searchRow { flex-direction:row; }
     .searchRow input { width:auto; }
@@ -424,6 +425,14 @@
     <div class="controlGroup">
       <span class="groupLabel">Afspelen</span>
       <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
+    </div>
+
+    <div class="controlGroup">
+      <span class="groupLabel">Tempo</span>
+      <div class="groupRow">
+        <input type="range" id="tempoSlider" min="50" max="150" step="5" value="100" aria-label="Afspeeltempo, percentage van het liedtempo">
+        <span class="pill" id="tempoValue">100%</span>
+      </div>
     </div>
 
     <div class="controlGroup">
@@ -678,6 +687,7 @@ let notes = [];
 let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
+let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
 let phRect = null, liveMarker = null, liveLabel = null;
 let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
 
@@ -700,7 +710,7 @@ function loadSong(s) {
   stopPlay(false);
   resetNoteDetection();
   song = s;
-  beatMs = 60000 / s.bpm;
+  beatMs = 60000 / s.bpm / tempoScale;
   notes = parseHand(s);
   contextNotes = s.left ? parseHand(s.left) : [];
   idx = 0; wrongs = 0; streak = 0;
@@ -1216,6 +1226,7 @@ function startPlay(forceSound = false) {
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   playing = true;
+  beatMs = 60000 / song.bpm / tempoScale;
   startT = performance.now();
   setPlayButtonsState(true);
   document.getElementById('restart').disabled = true;
@@ -2006,6 +2017,11 @@ renderSongList();
 
 document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
+});
+
+document.getElementById('tempoSlider').addEventListener('input', (e) => {
+  tempoScale = Number(e.target.value) / 100;
+  document.getElementById('tempoValue').textContent = `${e.target.value}%`;
 });
 
 document.getElementById('micBtn').addEventListener('click', async () => {
