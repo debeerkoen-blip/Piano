@@ -162,6 +162,15 @@
       </div>
 
       <div class="controlGroup">
+        <span class="groupLabel">Niveau</span>
+        <select id="difficulty">
+          <option value="beginner">Beginner</option>
+          <option value="medior" selected>Medior</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+
+      <div class="controlGroup">
         <span class="groupLabel">Microfoon</span>
         <div class="groupRow">
           <button id="micBtn">Microfoon aan</button>
@@ -228,7 +237,17 @@ const SONGS = [
 
 // ---------- Constanten voor timing ----------
 const COUNT_IN = 4;   // tellen voordat de balk start (in tellen)
-const WINDOW   = 0.5; // acceptatievenster rond een noot, in tellen
+
+// ---------- Niveaus: speling in timing en toonhoogte ----------
+// window: hoe ver je naast de tel mag zitten en de noot telt nog (in tellen).
+// perfectWindow: hoe dicht bij de tel voor de volle timingbonus.
+// octaveStrict: true betekent dat alleen de exacte octaaf telt, niet elke octaaf van dezelfde toon.
+const DIFFICULTIES = {
+  beginner: { label: 'Beginner', window: 0.75, perfectWindow: 0.35, octaveStrict: false },
+  medior:   { label: 'Medior',   window: 0.5,  perfectWindow: 0.15, octaveStrict: false },
+  advanced: { label: 'Advanced', window: 0.25, perfectWindow: 0.08, octaveStrict: true }
+};
+let difficulty = DIFFICULTIES.medior;
 
 // ---------- Notenhulpjes ----------
 const LETTERS = { C:0, D:1, E:2, F:3, G:4, A:5, B:6 };
@@ -379,17 +398,21 @@ function onHeard(midi, tEvent) {
   const target = notes[idx];
   const diff = midi - target.midi;
   const samePitchClass = ((diff % 12) + 12) % 12 === 0;
+  const exactOctave = diff === 0;
+  // Bij "advanced" telt alleen de exacte octaaf, niet elke octaaf van dezelfde toon.
+  const pitchOk = difficulty.octaveStrict ? exactOctave : samePitchClass;
 
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
-    if (samePitchClass) {
-      const bonus = diff === 0 ? 10 : 6;
-      xp += bonus;
+    if (pitchOk) {
+      const pitchPts = exactOctave ? 10 : 6;
+      xp += pitchPts;
       streak++;
-      if (streak >= 5) xp += 5;
+      let streakNote = '';
+      if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
       idx++;
       skipRests();
-      setFeedback(`Goed! +${bonus} XP${diff === 0 ? '' : ' (andere octaaf telt ook)'}`, 'ok');
+      setFeedback(`Goed! +${pitchPts} toon${exactOctave ? '' : ' (andere octaaf telt ook)'}${streakNote}`, 'ok');
       if (idx === notes.length) finish();
       else render();
     } else {
@@ -401,15 +424,16 @@ function onHeard(midi, tEvent) {
     return;
   }
 
-  // Speel af: noot telt alleen binnen het venster rond de balk.
+  // Speel af: noot telt alleen binnen het venster rond de balk. De breedte van
+  // dat venster hangt af van het gekozen niveau.
   const t = (tEvent - startT) / beatMs - COUNT_IN;
-  if (t < target.start - WINDOW) {
+  if (t < target.start - difficulty.window) {
     setFeedback(`Te vroeg. Wacht tot de balk bij ${target.label} is.`, 'bad');
     return;
   }
-  if (t > target.start + WINDOW) return; // wordt door tick als gemist gemarkeerd
+  if (t > target.start + difficulty.window) return; // wordt door tick als gemist gemarkeerd
 
-  if (!samePitchClass) {
+  if (!pitchOk) {
     wrongs++;
     streak = 0;
     setFeedback(`Verkeerde noot: je speelde ${midiToLabel(midi)}, nu is ${target.label} met R${target.finger} aan de beurt`, 'bad');
@@ -418,15 +442,17 @@ function onHeard(midi, tEvent) {
   }
 
   const off = t - target.start;
-  const perfect = Math.abs(off) <= 0.15;
-  const bonus = (diff === 0 ? 10 : 6) + (perfect ? 5 : 0);
-  xp += bonus;
+  const perfect = Math.abs(off) <= difficulty.perfectWindow;
+  const pitchPts = exactOctave ? 10 : 6;
+  const timingPts = perfect ? 5 : 0;
+  xp += pitchPts + timingPts;
   streak++;
-  if (streak >= 5) xp += 5;
+  let streakNote = '';
+  if (streak >= 5) { xp += 5; streakNote = ' +5 reeks'; }
   idx++;
   skipRests();
   const timing = perfect ? 'Perfect' : off < 0 ? 'Iets vroeg' : 'Iets laat';
-  setFeedback(`${timing}! +${bonus} XP`, 'ok');
+  setFeedback(`${timing}! +${pitchPts} toon${timingPts ? ` +${timingPts} timing` : ''}${streakNote}`, 'ok');
 
   if (idx === notes.length) stopPlay(true);
   else { render(); updateStats(); }
@@ -508,7 +534,7 @@ function tick(now) {
     // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
     // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
     let missed = false;
-    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + WINDOW)) {
+    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + difficulty.window)) {
       if (notes[idx].rest) {
         idx++;
         continue;
@@ -922,6 +948,10 @@ SONGS.forEach((s, i) => {
   songSelect.appendChild(o);
 });
 songSelect.addEventListener('change', () => loadSong(SONGS[songSelect.value]));
+
+document.getElementById('difficulty').addEventListener('change', (e) => {
+  difficulty = DIFFICULTIES[e.target.value];
+});
 
 document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
