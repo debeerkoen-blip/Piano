@@ -38,6 +38,18 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   plaats van meteen te verdwijnen zodra de toon wegvalt.
 - Oefenmodus: alleen toonhoogte, zonder tijd.
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
+  Beginner heeft een ruim tijdvenster (2 tellen), zodat de juiste toon al telt ook al ben je
+  lang niet precies op de tel; dat kost alleen de timingbonus, niet de toonpunten. Beginner is
+  het standaardniveau.
+- Gemiste noten (door tick()'s "gemist"-sweep, niet door een verkeerd gespeelde toon) krijgen
+  een rode rand op de notenbalk in plaats van groen, zodat je in één oogopslag ziet welke noten
+  je niet op tijd te pakken kreeg. Bijgehouden in `noteResults` (per noot-index 'hit' of
+  'missed'), gereset bij elk nieuw lied en bij elke nieuwe poging.
+- Een juist geraakte noot krijgt een korte "flits"-animatie (`animateNoteHit()`): de noot veert
+  even op en er dijt een ring omheen uit die wegvaagt, zoals in ritmespellen als Guitar Hero.
+  Gemiste of nog niet gespeelde noten blijven gewoon staan, geen animatie. Werkt los van
+  render()/drawGrandStaff (die tekenen de hele notenbalk steeds opnieuw): de animatie wordt
+  apart getriggerd, meteen na het herteken, op precies de noot die net geraakt is.
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
