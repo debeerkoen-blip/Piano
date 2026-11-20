@@ -200,14 +200,40 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tegelijk, dus allebei de handen tegelijk beoordelen kan nog niet betrouwbaar. De linkerhand
   staat er gedimd bij als voorbeeld en klinkt wel mee bij "Speel af" met geluid aan. "Lied
   toevoegen" heeft een los rijenblok voor de linkerhand (optioneel).
-- Akkoorden: alleen bij de linkerhand (om dezelfde reden als hierboven: de microfoon herkent
-  maar één toon tegelijk, dus de rechterhand blijft monofoon). Op een tel staat dan een lijst
-  notenamen (`['C3','E3','G3']`) in plaats van één naam. De notenbalk tekent dat als gestapelde
-  notenkoppen met één gedeelde stok (stokrichting op de toonhoogte die het verst van de
-  middenlijn afstaat) en een voorteken per toonhoogte; bij "Speel af" klinken alle tonen van het
-  akkoord gelijktijdig. "Lied toevoegen" heeft een "+ akkoord"-knop per rij in het
-  linkerhandblok, die een extra toonhoogte-kiezer toevoegt (alleen daar, niet bij de
-  rechterhand).
+- Akkoorden: op een tel staat dan een lijst notenamen (`['C3','E3','G3']`) in plaats van één
+  naam. De notenbalk tekent dat als gestapelde notenkoppen met één gedeelde stok (stokrichting
+  op de toonhoogte die het verst van de middenlijn afstaat) en een voorteken per toonhoogte; bij
+  "Speel af" klinken alle tonen van het akkoord gelijktijdig. "Lied toevoegen" heeft een
+  "+ akkoord"-knop per rij, bij beide handen, die een extra toonhoogte-kiezer toevoegt.
+  Akkoorden bij de rechterhand worden ook echt door de microfoon gecontroleerd (zie
+  `detectChordMatch` hieronder), niet alleen getoond zoals bij de linkerhand.
+- Akkoordherkenning bij de rechterhand (`detectChordMatch`, `advanceChordState`,
+  `CHORD_FFT_SIZE`/omgeving in de microfoon-sectie): de twee monofone detectoren (autocorrelatie
+  en YIN) geven één beste toonhoogte terug, dat is geen zinnig antwoord zodra er meerdere tonen
+  tegelijk klinken. In plaats van blind te proberen alle spelende tonen te raden (polyfone
+  transcriptie in het echt, veel feilbaarder), checkt `detectChordMatch` GERICHT of de
+  toonhoogtes die het huidige akkoord al zou moeten bevatten er met genoeg energie staan: er
+  wordt toch al precies één akkoord verwacht. Loopt via een eigen, grotere analyser
+  (`chordAnalyser`, `CHORD_FFT_SIZE = 32768`, geen tijd-smoothing) naast de kleinere analyser van
+  de twee monofone detectoren: akkoordherkenning werkt in het frequentiedomein en wil juist een
+  hoge frequentieresolutie (bij lage noten liggen halve tonen maar een paar Hz uit elkaar),
+  terwijl de monofone detectoren juist een kort tijdvenster willen voor snelle periodedetectie
+  van één toon. Dat maakt het analysevenster ruim 740ms lang: een akkoord moet dus even
+  worden vastgehouden voor een schone meting (geen probleem voor hoe lang een akkoord normaal
+  al wordt aangeslagen). Akkoorden tellen altijd op de exacte octaaf, nooit "elke octaaf van
+  dezelfde toon" zoals bij een losse noot in Beginner/Medior: bij meerdere gelijktijdige tonen
+  is dat te onbetrouwbaar.
+  Bekende beperking, geen bug: de boventoon (2x de frequentie) van een lage gespeelde noot ligt
+  altijd precies op de octaaf erboven, dus als een akkoord toevallig een verwachte toon bevat die
+  exact een octaaf boven een ANDERE, wél gespeelde toon ligt, kan dat als "gehoord" meetellen ook
+  al is die specifieke toonhoogte zelf niet aangeslagen. Bij een echt fout akkoord (geen
+  overlappende boventonen) wordt dat betrouwbaar als niet-matchend herkend (uitgebreid getest,
+  zie de sessie-aantekeningen); dit raakt vooral akkoorden die zelf al een octaafsprong bevatten.
+  De gewone staaf-/toetsenbordweergave (volledig ingekleurd bij goed/fout, de paarse "nu
+  spelen"-markering, de flits-animatie bij een rake noot) werkt voor een akkoord bij de
+  rechterhand precies hetzelfde als voor een losse noot: `onHeard()`, `renderKeyboard()` en
+  `animateNoteHit()` zijn generiek gemaakt (een losse noot is nu gewoon een "akkoord" van één
+  toonhoogte) in plaats van overal apart akkoord-logica toe te voegen.
 - Automatisch noten uit een foto/pdf lezen (optical music recognition) doet de app zelf niet: dat
   vraagt een externe beeldherkenningsdienst en dus een server, wat niet past bij één bestand
   zonder build-stap, en de uitkomst op een foto is sowieso niet gegarandeerd correct. In plaats
@@ -232,7 +258,11 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   linkerhand (einde maat 15 en heel maat 16) is in de bron een akkoord van twee noten; de app kent
   nog geen akkoorden, dus dat is teruggebracht tot één noot (C naar F, als V-I slotcadens).
   Controleer tegen de partituur voordat je 'm serieus oefent.
-- Nog niet getest met een echte piano. Test met microfoon in een rustige kamer.
+- Nog niet getest met een echte piano. Test met microfoon in een rustige kamer. Geldt extra
+  voor akkoordherkenning bij de rechterhand (`detectChordMatch`): die is alleen digitaal getest
+  (geschakeld geluid rechtstreeks afgetapt naar een analyser, zie de uitleg bij "Huidige stand"),
+  nog niet met een echte microfoon en akoestische piano. De drempelwaarden (`CHORD_PEAK_MIN_DB`
+  e.a.) zijn daarop gebaseerd en kunnen bijstelling nodig hebben zodra dat wel gebeurt.
 - iPhone-liggend (landscape, lage viewport): de notenbalk is vergroot op verzoek
   (`min(48vh, 250px)`, was `min(42vh, 220px)`), maar de pagina was daar al wat hoger dan het
   scherm vóór die vergroting; nu moet je iets meer scrollen om de hele kaart te zien. Geen
@@ -246,9 +276,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 1. Testen op telefoon en laptop. Timing-venster en detectiedrempels afstellen.
 2. Voortgang opslaan in localStorage.
 3. Linkerhand ook kunnen oefenen (niet alleen tonen): bijvoorbeeld een handkeuze naast Niveau,
-   die bepaalt welke hand de microfoon beoordeelt. Akkoorden bij de rechterhand (en ze laten
-   meebeoordelen door de microfoon) staat hier ook nog: dat vraagt polyfone toonhoogteherkenning,
-   iets heel anders dan de huidige twee monofone detectoren.
+   die bepaalt welke hand de microfoon beoordeelt. Akkoorden bij de rechterhand worden inmiddels
+   wel al door de microfoon gecontroleerd (`detectChordMatch`, zie "Huidige stand"); de
+   linkerhand gebruikt die herkenning nog niet.
 4. Spotify-koppeling: liked songs als wensenlijst, met een voortgangsbalk per nummer.
 5. Losse modules splitsen (audio, notenbalk, spelmotor) zodra het groter wordt.
 6. "Lied toevoegen": noten uit een pdf met meerdere bladzijdes.
