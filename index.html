@@ -104,7 +104,9 @@
   .icon-btn:disabled { background:#e7e4f0; color:#9a93b3; cursor:default; }
   .icon-btn[aria-expanded="true"] { background:var(--accent-ring); color:#fff; }
   .icon-btn.warnBtn { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.2); }
-  .icon-btn.micOffHint { border-color:var(--bad-text); }
+  /* Zachte "let op", geen harde foutmelding: dezelfde amberkleur als warnBtn
+     (het conceptlabel), in plaats van het alarmrood van .bad. */
+  .icon-btn.micOffHint { background:#fff3d6; color:#7a5300; border-color:rgba(122,83,0,.35); }
   /* Zonder deze regel wint "display:inline-flex" hierboven van de browser-eigen
      "[hidden] { display:none }" bij gelijke specificiteit, en blijft een
      verborgen icoonknop (zoals draftBadge) gewoon zichtbaar. */
@@ -166,7 +168,7 @@
      tonen. */
   #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
   .playLabel { font-size:16px; color:var(--muted); text-align:center; margin:var(--space-2) 0 0; }
-  .playLabel.micOffHint { color:var(--bad-text); font-weight:600; }
+  .playLabel.micOffHint { color:#7a5300; }
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
 
@@ -1658,6 +1660,13 @@ function seekTo(targetT) {
 
 function tick(now) {
   if (!playing) return;
+  if (suppressAutoScroll) {
+    // De speler sleept zelf over de notenbalk: alles even bevriezen (geen noten
+    // die stilletjes als gemist tellen, geen geluid dat niet meer bij het
+    // zichtbare stuk hoort) totdat seekTo() de klok opnieuw gelijkzet.
+    rafId = requestAnimationFrame(tick);
+    return;
+  }
   const t = (now - startT) / beatMs - COUNT_IN;
 
   if (t < 0) {
@@ -2564,6 +2573,13 @@ document.querySelector('.staffWrap').addEventListener('scroll', () => {
   const wrap = document.querySelector('.staffWrap');
   if (wrap.scrollLeft === lastProgrammaticScrollLeft) return; // onze eigen auto-scroll
   if (!playing) return;
+  if (!suppressAutoScroll) {
+    // Eerste scroll-event van deze sleepbeweging: meteen stil in plaats van het
+    // geluid van vóór het slepen te laten doorlopen, dat hoort toch niet meer
+    // bij het stuk dat nu in beeld staat.
+    scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+    scheduledSources = [];
+  }
   suppressAutoScroll = true;
   clearTimeout(userScrollTimer);
   userScrollTimer = setTimeout(() => {
