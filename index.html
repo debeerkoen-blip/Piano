@@ -1359,6 +1359,12 @@ function seekTo(targetT) {
 
   let newIdx = notes.findIndex(n => n.start + n.dur > targetT);
   if (newIdx === -1) newIdx = Math.max(0, notes.length - 1);
+  // Vooruit scrollen slaat noten over die nog niet aan de beurt zijn geweest: die
+  // zijn net zo min gespeeld als een gemiste noot, dus geen stille groene valse
+  // positief op de notenbalk.
+  for (let i = idx; i < newIdx; i++) {
+    if (!notes[i].rest && noteResults[i] === undefined) noteResults[i] = 'missed';
+  }
   idx = newIdx;
   skipRests();
 
