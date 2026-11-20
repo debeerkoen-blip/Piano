@@ -68,6 +68,7 @@
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
 
   .legend { font-size:13px; color:var(--muted); margin-top:var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-1) var(--space-4); align-items:center; }
+  .legend[hidden] { display:none; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   /* ---------- Besturing, gegroepeerd per functie ---------- */
   .controlGroups { display:flex; flex-wrap:wrap; gap:var(--space-6); margin-top:var(--space-6); }
@@ -119,6 +120,44 @@
   .searchCard h2 { margin:0 0 var(--space-1); font-size:17px; }
   .searchRow input { flex:1 1 200px; min-width:0; }
 
+  /* ---------- Lied toevoegen vanaf foto/pdf ---------- */
+  .addCard { margin-top:var(--space-6); }
+  .addCard .groupLabel { display:block; margin-top:var(--space-4); margin-bottom:var(--space-1); }
+  /* Foto/pdf en het voorbeeldbalkje naast elkaar, zodat ze makkelijk te vergelijken
+     zijn; op smalle schermen staan ze gewoon onder elkaar. */
+  .addLayout { display:grid; grid-template-columns: 1fr; gap: var(--space-4); margin-top: var(--space-4); align-items:start; }
+  @media (min-width: 760px) {
+    .addLayout { grid-template-columns: 1fr 1fr; }
+  }
+  .addRef, .addStaffWrap { min-width:0; }
+  .addStaffWrap .previewStaff { margin-top:var(--space-2); }
+  .fileLabel { display:block; font-size:13px; color:var(--muted); }
+  .fileLabel input { display:block; margin-top:var(--space-2); }
+  .refPreview { margin-top:var(--space-3); }
+  .refPreview img { max-width:100%; max-height:420px; border-radius:var(--radius-m); border:1px solid var(--border); display:block; }
+  .refPreview embed { width:100%; height:420px; border-radius:var(--radius-m); border:1px solid var(--border); }
+  .formRow { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-top:var(--space-4); }
+  .formRow label { font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:var(--space-1); }
+  .formRow input {
+    font: inherit; font-size:15px; padding:0 var(--space-3); min-height:40px;
+    border-radius:var(--radius-s); border:1px solid var(--border); width:160px;
+    background:var(--surface); color:var(--ink);
+  }
+  .noteRows { margin-top:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2); }
+  .noteRow {
+    display:flex; gap:var(--space-2); align-items:center; background:#f4f1fb;
+    border-radius:var(--radius-s); padding:var(--space-2) var(--space-3); flex-wrap:wrap;
+  }
+  .noteRow select { min-width:0; min-height:36px; padding:0 var(--space-2); font-size:14px; }
+  .noteRow .rowNum { font-size:12px; color:var(--muted); width:20px; }
+  .noteRow label.restLabel { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:var(--space-1); }
+  .noteRow .removeRow { margin-left:auto; min-height:30px; padding:0 var(--space-3); background:#ffe0e6; color:var(--bad-text); font-size:13px; }
+  .rowButtons { margin-top:var(--space-3); display:flex; gap:var(--space-2); flex-wrap:wrap; }
+  .previewStaff { margin-top:var(--space-4); background:#fbfaf7; border-radius:var(--radius-m); border:1px solid var(--border); }
+  .customList { margin-top:var(--space-6); }
+  .customSong { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-top:1px solid var(--border); font-size:14px; }
+  .deleteBtn { background:#ffe0e6; color:var(--bad-text); }
+
   :focus-visible { outline:2px solid var(--accent-ring); outline-offset:2px; }
 
   @media (max-width: 599.98px) {
@@ -130,6 +169,7 @@
     .searchRow { flex-direction:row; }
     .searchRow input { width:auto; }
     .searchRow button { width:auto; flex:0 0 auto; }
+    .formRow input { width:100%; }
   }
 </style>
 </head>
@@ -159,6 +199,10 @@
     <div class="legend">
       <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
       <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
+    </div>
+    <div class="legend" id="handLegend" hidden>
+      De onderste notenbalk (links, L1 t/m L5) is de linkerhand: die staat er alleen bij
+      als voorbeeld en wordt nog niet door de microfoon beoordeeld.
     </div>
 
     <div class="controlGroups">
@@ -216,13 +260,63 @@
       <button id="musicSearchBtn">Zoek op IMSLP</button>
     </div>
   </div>
+
+  <div class="card addCard">
+    <button id="addToggle" class="btn-ghost" type="button">+ Lied toevoegen (vanaf foto of pdf)</button>
+    <div id="addPanel" hidden>
+      <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
+
+      <div class="addLayout">
+        <div class="addRef">
+          <label class="fileLabel">Foto of pdf van de bladmuziek
+            <input type="file" id="refFile" accept="image/*,application/pdf">
+          </label>
+          <div id="refPreview" class="refPreview"></div>
+        </div>
+        <div class="addStaffWrap">
+          <span class="groupLabel">Voorbeeld (vergelijk met de foto hiernaast)</span>
+          <svg id="previewStaff" viewBox="0 0 600 240" class="previewStaff"></svg>
+        </div>
+      </div>
+
+      <div class="formRow">
+        <label>Titel <input type="text" id="newTitle" placeholder="Titel van het lied"></label>
+        <label>Tempo (bpm) <input type="number" id="newBpm" value="100" min="30" max="240"></label>
+        <label>Tellen per maat <input type="number" id="newBeats" value="4" min="1" max="12"></label>
+      </div>
+
+      <span class="groupLabel">Rechterhand</span>
+      <div id="noteRows" class="noteRows"></div>
+      <div class="rowButtons">
+        <button id="addNoteBtn" class="btn-ghost" type="button">+ Noot</button>
+        <button id="addRestBtn" class="btn-ghost" type="button">+ Rust</button>
+      </div>
+
+      <span class="groupLabel">Linkerhand (optioneel)</span>
+      <div id="noteRowsLeft" class="noteRows"></div>
+      <div class="rowButtons">
+        <button id="addNoteBtnLeft" class="btn-ghost" type="button">+ Noot</button>
+        <button id="addRestBtnLeft" class="btn-ghost" type="button">+ Rust</button>
+      </div>
+
+      <div class="groupRow">
+        <button id="saveSongBtn" type="button">Lied opslaan</button>
+        <span class="pill" id="addFeedback"></span>
+      </div>
+    </div>
+
+    <div id="customList" class="customList"></div>
+  </div>
 </main>
 
 <script>
 // ---------- Liederen (losse data, makkelijk aan te vullen) ----------
-// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf. Gebruik null voor een rust.
+// Notatie: notenaam + octaaf, bv. "E4" = E in de middelste octaaf, "Bb4"/"F#4" voor mol/kruis.
+// Gebruik null voor een rust.
 // fingers: rechterhandvinger per noot (1 = duim, 5 = pink). null op een rust-plek.
-// bpm: tempo voor "Speel af". Elke noot of rust duurt hier één tel.
+// bpm: tempo voor "Speel af".
+// durations: optioneel, lengte per noot/rust in tellen (1 = kwart, 0.5 = achtste, 1.5 = kwart
+// gestippeld, enz.). Zonder durations duurt elke noot of rust één tel, zoals voorheen.
 // beatsPerMeasure: aantal tellen per maat, voor de maatstrepen in de notenbalk.
 // draft: true betekent dat de noten, vingerzetting en maatindeling nog niet zijn gecontroleerd.
 const SONGS = [
@@ -244,6 +338,62 @@ const SONGS = [
     draft: true,
     notes:   ['F#4','E4','D4','E4','F#4','A4','F#4','E4'],
     fingers: [ 3,    2,   1,   2,   3,    5,   3,    2 ]
+  },
+  {
+    id: 'sinterklaas-deur',
+    title: 'Sinterklaas: Daar wordt aan de deur geklopt (arr. Y vd Berg)',
+    bpm: 100,
+    beatsPerMeasure: 3,
+    draft: true,
+    // Overgetypt van een foto van de bladmuziek, alleen de rechterhand/melodie
+    // (geen baspartij, geen akkoorden: dat kan de app nog niet). Vingerzetting
+    // is alleen overgenomen waar de partituur een cijfer gaf; op de andere noten
+    // is dat cijfer aangehouden tot het volgende cijfer. Controleer tegen de
+    // partituur voordat je dit serieus oefent.
+    notes: [
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'A4','F4','F4',
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'F4',
+      'E4','A3','A3', 'F4','D4','D4', 'E4','A3','A3', 'F4','D4','D4',
+      'C5','D5','C5','Bb4', 'A4','F4','F4', 'G4','C4','C4', 'F4'
+    ],
+    durations: [
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 1,1,1,
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 3,
+      1,1,1, 1,1,1, 1,1,1, 1,1,1,
+      1.5,0.5,0.5,0.5, 1,1,1, 1,1,1, 3
+    ],
+    fingers: [
+      4,4,4,4, 4,4,4, 4,4,4, 1,1,1,
+      1,1,1,1, 4,4,4, 4,4,4, 4,
+      4,4,4, 5,5,5, 4,4,4, 5,5,5,
+      4,4,4,4, 4,4,4, 4,4,4, 4
+    ],
+    // Linkerhand (baspartij), ook overgetypt van de foto met pixelmetingen.
+    // De laatste twee tellen (einde van maat 15 en heel maat 16) waren in de
+    // bron een akkoord van twee noten; de app kent nog geen akkoorden, dus die
+    // zijn teruggebracht tot één noot (de onderste/belangrijkste), op het gehoor
+    // gecontroleerd als een V-I slotcadens (C naar F). Extra reden om dit tegen
+    // de partituur te controleren.
+    left: {
+      notes: [
+        'E3','D3','E3', 'F3', 'E3', 'E3',
+        'E3','D3','E3', 'F3', 'E3','D3','C3', 'F3',
+        'E3','E3', 'F3', 'E3','D3','C3', 'F3',
+        'E3','D3','E3', 'F3', 'E3','C3', 'F3'
+      ],
+      durations: [
+        1,1,1, 3, 3, 3,
+        1,1,1, 3, 1.5,0.5,1, 3,
+        2,1, 3, 1.5,0.5,1, 3,
+        1,1,1, 3, 2,1, 3
+      ],
+      fingers: [
+        3,3,3, 3, 3, 3,
+        3,3,3, 3, 3,3,3, 3,
+        3,3, 3, 3,3,3, 3,
+        3,3,3, 3, 3,1, 1
+      ]
+    }
   }
 ];
 
@@ -268,10 +418,10 @@ const NAME_PC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 function parseNote(n) {
   const letter = n[0];
-  const accidental = n.length === 3 ? n[1] : '';
+  const accidental = n.length === 3 ? n[1] : ''; // '#' of 'b'
   const octave = parseInt(n[n.length - 1], 10);
   const base = (octave + 1) * 12 + SEMI[LETTERS[letter]];
-  const midi = base + (accidental === '#' ? 1 : 0);
+  const midi = base + (accidental === '#' ? 1 : accidental === 'b' ? -1 : 0);
   const step = octave * 7 + LETTERS[letter];
   return { midi, step, label: n, letter };
 }
@@ -289,23 +439,59 @@ function el(tag, attrs, parent = staff) {
   return e;
 }
 const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
+const yOfBass = step => 330 - (step - 18) * 10; // G2 zit op de onderste lijn
 const xOf = i => 110 + i * 34;
+
+// X-positie van een noot. Bij een lied zonder linkerhand staan de noten gewoon
+// even ver uit elkaar op volgorde (xOf). Heeft een lied wel een linkerhand, dan
+// moeten beide handen op dezelfde tel verticaal uitgelijnd staan, dus dan telt
+// de echte teltijd (note.start) in plaats van de positie in de rij.
+function noteX(note, i) {
+  return song.left ? (110 + note.start * 34) : xOf(i);
+}
+
+// X-positie van de speelstreep op tijdstip t (in tellen).
+function xAtTime(t) {
+  if (song.left) return 110 + Math.max(0, t) * 34;
+  if (!notes.length) return xOf(0);
+  let i = 0;
+  while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
+  const cur = notes[i];
+  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + 34;
+  const frac = cur.dur > 0 ? Math.min(1, Math.max(0, (t - cur.start) / cur.dur)) : 0;
+  return xOf(i) + frac * (nextX - xOf(i));
+}
 
 // ---------- Spelstatus ----------
 let song = SONGS[0];
 let notes = [];
+let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let phRect = null, liveMarker = null, liveLabel = null;
+
+// Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
+// cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
+function parseHand(hand) {
+  const durations = hand.durations || hand.notes.map(() => 1);
+  let cum = 0;
+  return hand.notes.map((n, i) => {
+    const dur = durations[i];
+    const note = n === null
+      ? { rest: true, start: cum, dur, label: 'rust', finger: null }
+      : { ...parseNote(n), rest: false, finger: hand.fingers[i], start: cum, dur };
+    cum += dur;
+    return note;
+  });
+}
 
 function loadSong(s) {
   stopPlay(false);
   resetNoteDetection();
   song = s;
   beatMs = 60000 / s.bpm;
-  notes = s.notes.map((n, i) => n === null
-    ? { rest: true, start: i, label: 'rust', finger: null }
-    : { ...parseNote(n), rest: false, finger: s.fingers[i], start: i });
+  notes = parseHand(s);
+  contextNotes = s.left ? parseHand(s.left) : [];
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   document.getElementById('title').textContent = s.title;
@@ -313,6 +499,7 @@ function loadSong(s) {
   warn.hidden = !s.draft;
   warn.textContent = 'Let op: deze noten, vingerzetting en maatindeling zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
   document.getElementById('restart').disabled = true;
+  document.getElementById('handLegend').hidden = !s.left;
   setFeedback('Speel de eerste noot, of druk op Speel af.', '');
   render();
   updateStats();
@@ -337,53 +524,150 @@ function updateStats() {
   document.getElementById('bar').style.width = pct + '%';
 }
 
-function render() {
-  staff.innerHTML = '';
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:590, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' });
+// Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
+const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
+
+// Tekent een notenbalk (of grote notenbalk met baspartij erbij) in svgEl.
+// Gedeeld door de echte oefenbalk en het voorbeeldbalkje in "Lied toevoegen".
+// activeIdx: index van de noot die nu gespeeld/beoordeeld wordt in rightNotes,
+// of null voor een pure voorbeeldweergave (beide handen gewoon goed zichtbaar,
+// niets gemarkeerd of gedimd).
+function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx) {
+  svgEl.innerHTML = '';
+  const previewMode = activeIdx === null;
+  const hasLeft = leftNotes && leftNotes.length > 0;
+  const svgHeight = hasLeft ? 420 : 240;
+  const staffTop = 90, staffBottom = hasLeft ? 330 : 170;
+
+  const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
+  const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
+  const lastEndBeat = Math.max(
+    lastRight ? lastRight.start + lastRight.dur : 0,
+    lastLeft ? lastLeft.start + lastLeft.dur : 0
+  );
+  // Zonder linkerhand staan de noten gewoon op volgorde even ver uit elkaar
+  // (xOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
+  // uitgelijnd staan, dus dan telt de echte teltijd (note.start) voor de
+  // x-positie, bij beide handen.
+  const px = (note, i) => hasLeft ? (110 + note.start * 34) : xOf(i);
+  const svgWidth = hasLeft
+    ? Math.max(600, 110 + lastEndBeat * 34 + 60)
+    : Math.max(600, xOf(Math.max(rightNotes.length - 1, 0)) + 60);
+  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  svgEl.style.minWidth = svgWidth + 'px';
+
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
   clef.textContent = '\u{1D11E}';
 
-  // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#e0496a', opacity:0 });
-
-  // Maatstrepen: één per volle maat, plus een slotstreep aan het eind.
-  const beatsPerMeasure = song.beatsPerMeasure || 4;
-  for (let i = beatsPerMeasure; i < notes.length; i += beatsPerMeasure) {
-    const x = xOf(i) - 17;
-    el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 });
-  }
-  if (notes.length) {
-    const xEnd = xOf(notes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 });
+  if (hasLeft) {
+    [250,270,290,310,330].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
+    const bassClef = el('text', { x:20, y:300, 'font-size':48, fill:'#2b2640' }, svgEl);
+    bassClef.textContent = '\u{1D122}';
   }
 
-  notes.forEach((n, i) => {
-    const x = xOf(i);
-    const done = i < idx;
-    const opacity = done ? 1 : 0.45;
+  let playhead = null;
+  if (!previewMode) {
+    // Speelstreep eerst tekenen, zodat de noten erboven liggen.
+    playhead = el('rect', { x:0, y:staffTop - 35, width:3, height: staffBottom - staffTop + 70, rx:1.5, fill:'#e0496a', opacity:0 }, svgEl);
+  }
+
+  // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
+  // zodat het ook klopt bij noten die niet allemaal even lang duren. Bij twee
+  // handen lopen de maatstrepen door beide notenbalken heen.
+  let lastMeasure = 0;
+  rightNotes.forEach((n, i) => {
+    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
+    if (i > 0 && measureIdx > lastMeasure) {
+      const x = px(n, i) - 17;
+      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+    }
+    lastMeasure = measureIdx;
+  });
+  if (rightNotes.length) {
+    const xEnd = px(lastRight, rightNotes.length - 1) + 17;
+    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
+  }
+
+  function ledgerLines(x, step, yOfFn, bottomLineStep, topLineStep) {
+    if (step < bottomLineStep) {
+      for (let s = bottomLineStep - 2; s >= step; s -= 2) {
+        const ly = yOfFn(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+      }
+    } else if (step > topLineStep) {
+      for (let s = topLineStep + 2; s <= step; s += 2) {
+        const ly = yOfFn(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+      }
+    }
+  }
+
+  // isActiveHand: de hand die beoordeeld wordt (huidige noot gemarkeerd,
+  // gespeelde noten groen) tijdens het oefenen; bij een voorbeeldbalkje (geen
+  // activeIdx) staan beide handen gewoon duidelijk leesbaar.
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, isActiveHand, handPrefix }) {
+    const x = px(n, i);
 
     if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity });
+      const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
+      const rest = el('text', { x, y: yOfFn(bottomLineStep) - 24, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
 
-    const y = yOf(n.step);
+    const y = yOfFn(n.step);
     const isC = n.letter === 'C';
     const fill = isC ? '#ec8f4c' : '#2b2640';
-    const current = i === idx;
-    const noteOpacity = (done || current) ? 1 : 0.45;
-    const stroke = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
+    const dur = n.dur || 1;
+    const hollow = dur >= 2;
+    let noteOpacity = 1, highlight = 'none';
+    if (!previewMode) {
+      if (isActiveHand) {
+        const done = i < activeIdx;
+        const current = i === activeIdx;
+        noteOpacity = (done || current) ? 1 : 0.45;
+        highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
+      } else {
+        noteOpacity = 0.4;
+      }
+    }
 
-    if (n.step <= 28) el('line', { x1:x-12, x2:x+12, y1:190, y2:190, stroke:'#2b2640', 'stroke-width':1.5 });
-    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill, opacity: noteOpacity, stroke, 'stroke-width':2.5 });
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 });
+    ledgerLines(x, n.step, yOfFn, bottomLineStep, topLineStep);
+    el('ellipse', {
+      cx:x, cy:y, rx:8, ry:6,
+      fill: hollow ? '#fff' : fill,
+      opacity: noteOpacity,
+      stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
+      'stroke-width': highlight !== 'none' ? 2.5 : 1.8
+    }, svgEl);
+    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
+    if (dur < 1) {
+      // Vlaggetje voor een achtste noot.
+      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity }, svgEl);
+    }
+    if (isDotted(dur)) {
+      el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
+    }
 
-    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity });
-    finger.textContent = 'R' + n.finger;
-  });
+    const fingerY = n.step <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + 26 : y + 26;
+    const finger = el('text', { x, y: fingerY, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
+    finger.textContent = handPrefix + n.finger;
+  }
 
-  const label = el('text', { x:300, y:236, 'font-size':16, 'text-anchor':'middle', fill:'#555' });
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, isActiveHand: true, handPrefix: 'R' }));
+  if (hasLeft) {
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, isActiveHand: false, handPrefix: 'L' }));
+  }
+
+  return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
+}
+
+function render() {
+  const { svgWidth, svgHeight, playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx);
+  phRect = playhead;
+
+  const label = el('text', { x: svgWidth / 2, y: svgHeight - 4, 'font-size':16, 'text-anchor':'middle', fill:'#555' });
   label.textContent = idx < notes.length
     ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
     : 'Klaar!';
@@ -580,9 +864,12 @@ function startPlay() {
   if (document.getElementById('soundToggle').checked && audioCtx) {
     const beatSec = beatMs / 1000;
     const audioStart = audioCtx.currentTime;
-    notes.forEach(n => {
+    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
+    // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
+    // tussen de handen te horen.
+    [...notes, ...contextNotes].forEach(n => {
       if (n.rest) return;
-      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, beatSec * 0.8);
+      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
     });
   }
 
@@ -619,8 +906,7 @@ function tick(now) {
       stopPlay(true);
       return;
     }
-    const x = xOf(0) + t * 34 - 1.5;
-    phRect.setAttribute('x', x);
+    phRect.setAttribute('x', xAtTime(t) - 1.5);
     phRect.setAttribute('opacity', 1);
   }
   rafId = requestAnimationFrame(tick);
@@ -832,7 +1118,7 @@ function updateLiveMarker(f1, f2, midi) {
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
-  const x = xOf(atIdx) + 20;
+  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20;
   const color = confident ? '#2dd4bf' : '#f5a623';
 
   liveMarker.setAttribute('cx', x);
@@ -944,6 +1230,251 @@ async function calibrate() {
   setFeedback('Gekalibreerd op jouw piano. Je kunt verder oefenen.', 'ok');
 }
 
+// ---------- Zelf toegevoegde liedjes (opgeslagen in de browser) ----------
+const CUSTOM_SONGS_KEY = 'pianoCustomSongs';
+
+function loadCustomSongs() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_SONGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function saveCustomSongs(list) {
+  try { localStorage.setItem(CUSTOM_SONGS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+let customSongs = loadCustomSongs();
+function allSongs() { return SONGS.concat(customSongs); }
+function findSong(id) { return allSongs().find(s => s.id === id); }
+
+function renderCustomList() {
+  const wrap = document.getElementById('customList');
+  wrap.innerHTML = '';
+  if (!customSongs.length) return;
+  const heading = document.createElement('div');
+  heading.className = 'sub';
+  heading.style.marginTop = '16px';
+  heading.textContent = 'Zelf toegevoegde liedjes:';
+  wrap.appendChild(heading);
+  customSongs.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'customSong';
+    const label = document.createElement('span');
+    label.textContent = s.title;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'deleteBtn';
+    del.textContent = 'Verwijderen';
+    del.addEventListener('click', () => {
+      if (!confirm(`"${s.title}" verwijderen?`)) return;
+      customSongs = customSongs.filter(x => x.id !== s.id);
+      saveCustomSongs(customSongs);
+      const wasSelected = song.id === s.id;
+      populateSongSelect();
+      if (wasSelected) {
+        songSelect.value = SONGS[0].id;
+        loadSong(SONGS[0]);
+      }
+      renderCustomList();
+    });
+    row.appendChild(label);
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+}
+
+// ---------- Lied toevoegen: foto/pdf als hulpmiddel, noten met de hand invullen ----------
+document.getElementById('addToggle').addEventListener('click', () => {
+  document.getElementById('addPanel').hidden = !document.getElementById('addPanel').hidden;
+});
+
+document.getElementById('refFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  const wrap = document.getElementById('refPreview');
+  wrap.innerHTML = '';
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  if (file.type === 'application/pdf') {
+    const embed = document.createElement('embed');
+    embed.src = url;
+    embed.type = 'application/pdf';
+    wrap.appendChild(embed);
+  } else {
+    const img = document.createElement('img');
+    img.src = url;
+    wrap.appendChild(img);
+  }
+});
+
+const LETTERS_ORDER = ['C','D','E','F','G','A','B'];
+const ACCIDENTALS = [['', 'geen'], ['#', '#'], ['b', 'b']];
+const DURATIONS = [[0.5,'1/8 noot'],[1,'1/4 noot'],[1.5,'1/4 noot gestippeld'],[2,'1/2 noot'],[3,'1/2 noot gestippeld'],[4,'hele noot']];
+
+function selectEl(className, options, selected, labelFn) {
+  const sel = document.createElement('select');
+  sel.className = className;
+  options.forEach(opt => {
+    const [value, label] = Array.isArray(opt) ? opt : [opt, labelFn ? labelFn(opt) : opt];
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    if (String(value) === String(selected)) o.selected = true;
+    sel.appendChild(o);
+  });
+  return sel;
+}
+
+function createNoteRow(opts = {}, handPrefix = 'R') {
+  const row = document.createElement('div');
+  row.className = 'noteRow';
+
+  const num = document.createElement('span');
+  num.className = 'rowNum';
+  row.appendChild(num);
+
+  const restLabel = document.createElement('label');
+  restLabel.className = 'restLabel';
+  const restCb = document.createElement('input');
+  restCb.type = 'checkbox';
+  restCb.className = 'restCb';
+  restCb.checked = !!opts.rest;
+  restLabel.appendChild(restCb);
+  restLabel.appendChild(document.createTextNode('rust'));
+  row.appendChild(restLabel);
+
+  const letterSel = selectEl('letterSel', LETTERS_ORDER, opts.letter || 'C');
+  const accSel = selectEl('accSel', ACCIDENTALS, opts.accidental || '');
+  const octSel = selectEl('octSel', [3,4,5,6], opts.octave || 4);
+  const durSel = selectEl('durSel', DURATIONS, opts.dur || 1);
+  const fingerSel = selectEl('fingerSel', [1,2,3,4,5].map(f => [f, handPrefix + f]), opts.finger || 1);
+  [letterSel, accSel, octSel, durSel, fingerSel].forEach(s => row.appendChild(s));
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'removeRow';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', () => { row.remove(); renumberRows(row.parentElement.id); renderPreview(); });
+  row.appendChild(removeBtn);
+
+  function applyRestState() {
+    const isRest = restCb.checked;
+    letterSel.disabled = isRest;
+    accSel.disabled = isRest;
+    octSel.disabled = isRest;
+    fingerSel.disabled = isRest;
+  }
+  applyRestState();
+  [restCb, letterSel, accSel, octSel, durSel, fingerSel].forEach(inp => {
+    inp.addEventListener('change', () => { applyRestState(); renderPreview(); });
+  });
+
+  return row;
+}
+
+function renumberRows(containerId) {
+  document.querySelectorAll(`#${containerId} .noteRow`).forEach((row, i) => {
+    row.querySelector('.rowNum').textContent = (i + 1) + '.';
+  });
+}
+
+function wireRowButtons(containerId, addBtnId, restBtnId, handPrefix) {
+  document.getElementById(addBtnId).addEventListener('click', () => {
+    document.getElementById(containerId).appendChild(createNoteRow({}, handPrefix));
+    renumberRows(containerId);
+    renderPreview();
+  });
+  document.getElementById(restBtnId).addEventListener('click', () => {
+    document.getElementById(containerId).appendChild(createNoteRow({ rest: true }, handPrefix));
+    renumberRows(containerId);
+    renderPreview();
+  });
+}
+wireRowButtons('noteRows', 'addNoteBtn', 'addRestBtn', 'R');
+wireRowButtons('noteRowsLeft', 'addNoteBtnLeft', 'addRestBtnLeft', 'L');
+document.getElementById('newBeats').addEventListener('change', renderPreview);
+
+function readNoteRows(containerId) {
+  const rows = [...document.querySelectorAll(`#${containerId} .noteRow`)];
+  const notesOut = [], durationsOut = [], fingersOut = [];
+  rows.forEach(row => {
+    const dur = parseFloat(row.querySelector('.durSel').value);
+    durationsOut.push(dur);
+    if (row.querySelector('.restCb').checked) {
+      notesOut.push(null);
+      fingersOut.push(null);
+    } else {
+      const letter = row.querySelector('.letterSel').value;
+      const acc = row.querySelector('.accSel').value;
+      const oct = row.querySelector('.octSel').value;
+      notesOut.push(letter + acc + oct);
+      fingersOut.push(parseInt(row.querySelector('.fingerSel').value, 10));
+    }
+  });
+  return { notes: notesOut, durations: durationsOut, fingers: fingersOut };
+}
+
+// Hergebruikt dezelfde drawGrandStaff() als de echte oefenbalk, zodat het
+// voorbeeldbalkje er precies zo uitziet als wat je straks gaat oefenen.
+function renderPreview() {
+  const svgEl = document.getElementById('previewStaff');
+  const right = readNoteRows('noteRows');
+  const left = readNoteRows('noteRowsLeft');
+  if (!right.notes.length && !left.notes.length) { svgEl.innerHTML = ''; return; }
+
+  const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  const parseRows = hand => {
+    let cum = 0;
+    return hand.notes.map((n, i) => {
+      const dur = hand.durations[i];
+      const note = n === null
+        ? { rest:true, start:cum, dur, finger:null }
+        : { ...parseNote(n), rest:false, finger:hand.fingers[i], start:cum, dur };
+      cum += dur;
+      return note;
+    });
+  };
+  drawGrandStaff(svgEl, parseRows(right), parseRows(left), beatsPerMeasure, null);
+}
+
+document.getElementById('saveSongBtn').addEventListener('click', () => {
+  const fb = document.getElementById('addFeedback');
+  const title = document.getElementById('newTitle').value.trim();
+  const bpm = parseFloat(document.getElementById('newBpm').value) || 100;
+  const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
+  const right = readNoteRows('noteRows');
+  const left = readNoteRows('noteRowsLeft');
+
+  if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'pill bad'; return; }
+  if (!right.notes.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe bij de rechterhand.'; fb.className = 'pill bad'; return; }
+  for (const n of [...right.notes, ...left.notes]) {
+    if (n !== null && !/^[A-G](#|b)?[3-6]$/.test(n)) {
+      fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'pill bad'; return;
+    }
+  }
+
+  const newSong = {
+    id: 'custom-' + Date.now(),
+    title, bpm, beatsPerMeasure,
+    draft: true, custom: true,
+    notes: right.notes, durations: right.durations, fingers: right.fingers
+  };
+  if (left.notes.length) {
+    newSong.left = { notes: left.notes, durations: left.durations, fingers: left.fingers };
+  }
+  customSongs.push(newSong);
+  saveCustomSongs(customSongs);
+  populateSongSelect();
+  songSelect.value = newSong.id;
+  loadSong(newSong);
+  renderCustomList();
+  fb.textContent = `"${title}" opgeslagen en geladen.`;
+  fb.className = 'pill ok';
+});
+
+document.getElementById('noteRows').appendChild(createNoteRow({}, 'R'));
+renumberRows('noteRows');
+renderPreview();
+renderCustomList();
+
 // ---------- Zoeken naar klassieke stukken op IMSLP (gratis, publiek domein) ----------
 // Geen eigen databank-oproep: Openopus en IMSLP sturen geen CORS-header mee, dus een
 // fetch vanuit de browser wordt altijd geblokkeerd. In plaats daarvan openen we een
@@ -967,13 +1498,18 @@ document.getElementById('musicSearch').addEventListener('keydown', (e) => {
 
 // ---------- Knoppen ----------
 const songSelect = document.getElementById('song');
-SONGS.forEach((s, i) => {
-  const o = document.createElement('option');
-  o.value = i;
-  o.textContent = s.title;
-  songSelect.appendChild(o);
-});
-songSelect.addEventListener('change', () => loadSong(SONGS[songSelect.value]));
+function populateSongSelect() {
+  songSelect.innerHTML = '';
+  allSongs().forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.custom ? s.title + ' (zelf gemaakt)' : s.title;
+    songSelect.appendChild(o);
+  });
+}
+populateSongSelect();
+songSelect.value = song.id;
+songSelect.addEventListener('change', () => loadSong(findSong(songSelect.value)));
 
 document.getElementById('difficulty').addEventListener('change', (e) => {
   difficulty = DIFFICULTIES[e.target.value];
