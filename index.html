@@ -150,6 +150,10 @@
       <i style="background:#2b2640"></i>overige noten &nbsp;
       R1 t/m R5 = rechter hand, vinger 1 t/m 5
     </div>
+    <div class="legend">
+      <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
+      <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
+    </div>
 
     <div class="controlGroups">
       <div class="controlGroup">
@@ -261,7 +265,7 @@ let song = SONGS[0];
 let notes = [];
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
-let phRect = null;
+let phRect = null, liveMarker = null, liveLabel = null;
 
 function loadSong(s) {
   stopPlay(false);
@@ -352,6 +356,10 @@ function render() {
   label.textContent = idx < notes.length
     ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
     : 'Klaar!';
+
+  // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.
+  liveMarker = el('circle', { cx:0, cy:0, r:6, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5, opacity:0 });
+  liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
 
   updateScrollHint();
 }
@@ -684,6 +692,42 @@ function resetNoteDetection() {
   noteSilenceSince = 0;
 }
 
+// ---------- Live-indicator: toont wat de microfoon echt hoort, op de notenbalk ----------
+// Groen/teal = beide detectoren eens (betrouwbaar). Amber = maar één detector hoorde iets,
+// of ze zijn het oneens (onzeker, bijvoorbeeld door ruis of een octaaffout).
+function updateLiveMarker(f1, f2, midi) {
+  if (!liveMarker || !liveLabel) return;
+
+  let freq = null, confident = false;
+  if (midi !== null) { freq = f1; confident = true; }
+  else if (f1 || f2) { freq = f1 || f2; confident = false; }
+
+  if (!freq) {
+    liveMarker.setAttribute('opacity', 0);
+    liveLabel.setAttribute('opacity', 0);
+    return;
+  }
+
+  const rawMidi = Math.round(69 + 12 * Math.log2(freq / 440) - calibrationOffset);
+  const noteLabel = midiToLabel(rawMidi);
+  const step = parseNote(noteLabel).step;
+  const y = yOf(step);
+  const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
+  const x = xOf(atIdx) + 20;
+  const color = confident ? '#2dd4bf' : '#f5a623';
+
+  liveMarker.setAttribute('cx', x);
+  liveMarker.setAttribute('cy', y);
+  liveMarker.setAttribute('fill', color);
+  liveMarker.setAttribute('opacity', 1);
+
+  liveLabel.setAttribute('x', x);
+  liveLabel.setAttribute('y', y - 14);
+  liveLabel.setAttribute('fill', color);
+  liveLabel.textContent = noteLabel;
+  liveLabel.setAttribute('opacity', 1);
+}
+
 function listen() {
   if (!analyser) return;
   analyser.getFloatTimeDomainData(buf);
@@ -697,6 +741,7 @@ function listen() {
     midi = Math.round(69 + 12 * Math.log2(f1 / 440) - calibrationOffset);
   }
   document.getElementById('heard').textContent = midi !== null ? `Gehoord: ${midiToLabel(midi)}` : 'Gehoord: -';
+  updateLiveMarker(f1, f2, midi);
 
   const now = performance.now();
 
@@ -744,6 +789,7 @@ async function calibrate() {
       analyser.getFloatTimeDomainData(buf);
       const f = detectPitch(buf, audioCtx.sampleRate);
       if (f) samples.push(f);
+      updateLiveMarker(f, null, null);
       if (performance.now() - start > duration) {
         clearInterval(iv);
         resolve();
