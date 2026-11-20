@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microfoontest</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.3rem; }
+  button { font-size: 1.1rem; padding: 0.8rem 1.2rem; border: none; border-radius: 8px; background: #2563eb; color: white; width: 100%; margin-top: 1rem; }
+  button:disabled { background: #9ca3af; }
+  #stopBtn { background: #6b7280; }
+  #status { margin-top: 1rem; padding: 0.8rem; border-radius: 8px; background: #f3f4f6; white-space: pre-wrap; font-size: 0.95rem; }
+  #status.bad { background: #fee2e2; color: #991b1b; }
+  #status.good { background: #dcfce7; color: #166534; }
+  #meterWrap { margin-top: 1rem; height: 24px; background: #e5e7eb; border-radius: 6px; overflow: hidden; }
+  #meter { height: 100%; width: 0%; background: #22c55e; }
+  ul { font-size: 0.9rem; color: #4b5563; }
+</style>
+</head>
+<body>
+  <h1>Microfoontest</h1>
+  <p>Deze pagina vraagt alleen om microfoontoegang en laat zien of er geluid binnenkomt. Geen notenbalk, geen app, puur om te testen.</p>
+
+  <button id="askBtn">Vraag microfoontoegang</button>
+  <button id="stopBtn" style="display:none">Stop</button>
+
+  <div id="status">Nog niets geprobeerd.</div>
+  <div id="meterWrap"><div id="meter"></div></div>
+
+  <ul id="context"></ul>
+
+<script>
+const statusEl = document.getElementById('status');
+const meterEl = document.getElementById('meter');
+const askBtn = document.getElementById('askBtn');
+const stopBtn = document.getElementById('stopBtn');
+const contextEl = document.getElementById('context');
+
+let stream = null;
+let audioCtx = null;
+let raf = null;
+
+function setStatus(text, kind) {
+  statusEl.textContent = text;
+  statusEl.className = kind || '';
+}
+
+contextEl.innerHTML = `
+  <li>Adres: ${location.href}</li>
+  <li>Beveiligde context (https of localhost): ${window.isSecureContext ? 'ja' : 'nee'}</li>
+  <li>getUserMedia beschikbaar: ${navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'ja' : 'nee'}</li>
+`;
+
+function errorText(err) {
+  switch (err.name) {
+    case 'NotAllowedError':
+      return 'Toegang geweigerd. De browser heeft de microfoon geblokkeerd voor deze site, of je hebt net op "Weiger" getikt. Kijk bij de site-instellingen van de browser (vaak via het slotje of de drie puntjes naast het adres) of de microfoon daar op "Toestaan" staat.';
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      return 'Geen microfoon gevonden op dit apparaat.';
+    case 'NotReadableError':
+    case 'TrackStartError':
+      return 'De microfoon is bezet door een andere app, of er ging iets mis op hardwareniveau. Sluit andere apps die de microfoon gebruiken en probeer opnieuw.';
+    case 'SecurityError':
+      return 'De browser blokkeert microfoontoegang omdat de pagina niet als veilig wordt gezien. Dit zou niet moeten gebeuren via https.';
+    case 'AbortError':
+      return 'De aanvraag werd afgebroken voordat er een antwoord was.';
+    default:
+      return `Onbekende fout: ${err.name || 'geen naam'} ${err.message ? '(' + err.message + ')' : ''}`;
+  }
+}
+
+askBtn.addEventListener('click', async () => {
+  setStatus('Microfoon aanvragen...');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+    setStatus('Toegang verleend. Praat of speel een noot, de balk hieronder moet bewegen.', 'good');
+    askBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    src.connect(analyser);
+    const data = new Float32Array(analyser.fftSize);
+
+    function tick() {
+      analyser.getFloatTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
+      const rms = Math.sqrt(sum / data.length);
+      const pct = Math.min(100, rms * 400);
+      meterEl.style.width = pct + '%';
+      raf = requestAnimationFrame(tick);
+    }
+    tick();
+  } catch (err) {
+    setStatus(errorText(err), 'bad');
+  }
+});
+
+stopBtn.addEventListener('click', () => {
+  if (raf) cancelAnimationFrame(raf);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  meterEl.style.width = '0%';
+  stopBtn.style.display = 'none';
+  askBtn.style.display = 'block';
+  setStatus('Gestopt. Je kunt opnieuw proberen.');
+});
+</script>
+</body>
+</html>
