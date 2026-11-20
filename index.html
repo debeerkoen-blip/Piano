@@ -695,6 +695,16 @@ function xAtTime(t) {
   return xOf(i) + frac * (nextX - xOf(i));
 }
 
+// Omgekeerde van xAtTime/noteX: de teltijd die bij een x-positie hoort. Gebruikt
+// om te bepalen waar de speler naartoe heeft gescrold tijdens Speel af.
+function timeAtX(x) {
+  if (song.left) return Math.max(0, (x - 110) / 34);
+  if (!notes.length) return 0;
+  const i = Math.round((x - 110) / 34);
+  const clamped = Math.max(0, Math.min(notes.length - 1, i));
+  return notes[clamped].start;
+}
+
 // ---------- Spelstatus ----------
 let song = SONGS[0];
 let notes = [];
@@ -703,8 +713,17 @@ let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let tempoScale = 1; // schuifje in instellingen: percentage van het liedtempo, alleen "Speel af" (oefenmodus heeft geen tijd)
 let metronomeOn = false;
+let currentPlayHasSound = false; // of de lopende "Speel af" met pianogeluid speelt, voor herplannen na scroll-verspringen
 let phRect = null, liveMarker = null, liveLabel = null;
 let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan mag het automatisch meescrollen
+// dat niet meteen weer overschrijven. lastProgrammaticScrollLeft onderscheidt onze eigen
+// auto-scroll van een scroll door de speler: zet scrollLeft zelf, dan is het die van ons.
+let lastProgrammaticScrollLeft = null;
+let suppressAutoScroll = false;
+let userScrollTimer = null;
+const SCROLL_SEEK_DELAY_MS = 300;
 
 // Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
 // cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
@@ -973,11 +992,13 @@ function render() {
 // met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
 // noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
 function scrollStaffFollow(x, hasPrevious) {
+  if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
   const wrap = document.querySelector('.staffWrap');
   if (!wrap) return;
   const target = hasPrevious ? x - 34 - 20 : 0;
   const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
   wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
+  lastProgrammaticScrollLeft = wrap.scrollLeft;
 }
 
 // ---------- Beoordeling van een gehoorde noot ----------
@@ -1192,6 +1213,28 @@ function scheduleNoteSound(midi, when, duration) {
   }
 }
 
+// Plant de metronoomtikken van het lied (niet het aftellen) vanaf fromBeat, zodat zowel
+// een gewone start (fromBeat 0) als verdergaan na een scroll-sprong (fromBeat = waar je
+// naartoe scrolde) dezelfde planning gebruiken.
+function scheduleMetronomeFromBeat(fromBeat, audioStart, beatSec) {
+  const beatsPerMeasure = song.beatsPerMeasure || 4;
+  const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
+  for (let b = Math.max(0, Math.ceil(fromBeat)); b < songBeats; b++) {
+    scheduleMetronomeTick(audioStart + (b - fromBeat) * beatSec, b % beatsPerMeasure === 0);
+  }
+}
+
+// Plant het pianogeluid van de noten vanaf fromBeat, zelfde reden als hierboven.
+function scheduleNotesFromBeat(fromBeat, audioStart, beatSec) {
+  const noteList = [...notes, ...contextNotes].filter(n => !n.rest && n.start >= fromBeat);
+  loadPianoSamples(audioCtx).finally(() => {
+    if (!playing) return; // intussen gestopt of opnieuw verplaatst, niet meer plannen
+    noteList.forEach(n => {
+      scheduleNoteSound(n.midi, audioStart + (n.start - fromBeat) * beatSec, n.dur * beatSec * 0.85);
+    });
+  });
+}
+
 function scheduleSynthesizedNote(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
@@ -1263,40 +1306,56 @@ function startPlay(forceSound = false) {
   render();
   updateStats();
 
+  currentPlayHasSound = forceSound || document.getElementById('soundToggle').checked;
+
   if (audioCtx) {
     const beatSec = beatMs / 1000;
     const audioStart = audioCtx.currentTime;
 
     if (metronomeOn) {
-      const beatsPerMeasure = song.beatsPerMeasure || 4;
       for (let c = 0; c < COUNT_IN; c++) {
         scheduleMetronomeTick(audioStart + c * beatSec, c === 0);
       }
-      const songBeats = notes.length ? Math.ceil(notes[notes.length - 1].start + notes[notes.length - 1].dur) : 0;
-      for (let b = 0; b < songBeats; b++) {
-        scheduleMetronomeTick(audioStart + (COUNT_IN + b) * beatSec, b % beatsPerMeasure === 0);
-      }
+      scheduleMetronomeFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
     }
 
-    if (forceSound || document.getElementById('soundToggle').checked) {
-      // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
-      // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
-      // tussen de handen te horen.
-      const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
-      // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
-      // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
-      // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
-      // op null en gebruiken we de synthese.
-      loadPianoSamples(audioCtx).finally(() => {
-        if (!playing) return; // intussen gestopt, niet meer plannen
-        noteList.forEach(n => {
-          scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
-        });
-      });
+    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de rechterhand
+    // beoordeeld: dat klinkt muzikaler en helpt om de samenhang tussen de handen te horen.
+    if (currentPlayHasSound) {
+      scheduleNotesFromBeat(0, audioStart + COUNT_IN * beatSec, beatSec);
     }
   }
 
   rafId = requestAnimationFrame(tick);
+}
+
+// Verspring de speelpositie naar targetT (in tellen) zonder de score of de reeks te
+// resetten: bedoeld voor wanneer de speler tijdens Speel af zelf over de notenbalk
+// scrolt. Annuleert het reeds geplande geluid en plant het opnieuw vanaf de nieuwe plek.
+function seekTo(targetT) {
+  if (!playing || !notes.length) return;
+  targetT = Math.max(0, targetT);
+
+  scheduledSources.forEach(o => { try { o.stop(); } catch (e) {} });
+  scheduledSources = [];
+
+  let newIdx = notes.findIndex(n => n.start + n.dur > targetT);
+  if (newIdx === -1) newIdx = Math.max(0, notes.length - 1);
+  idx = newIdx;
+  skipRests();
+
+  // Geen aftellen: startT zo zetten dat tick() meteen op targetT uitkomt.
+  startT = performance.now() - (targetT + COUNT_IN) * beatMs;
+  resetNoteDetection();
+  render();
+  updateStats();
+
+  if (audioCtx) {
+    const beatSec = beatMs / 1000;
+    const audioStart = audioCtx.currentTime;
+    if (metronomeOn) scheduleMetronomeFromBeat(targetT, audioStart, beatSec);
+    if (currentPlayHasSound) scheduleNotesFromBeat(targetT, audioStart, beatSec);
+  }
 }
 
 function tick(now) {
@@ -1351,6 +1410,8 @@ function stopPlay(completed) {
   scheduledSources = [];
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
+  clearTimeout(userScrollTimer);
+  suppressAutoScroll = false;
   const was = playing;
   playing = false;
   setPlayButtonsState(false);
@@ -2088,6 +2149,21 @@ document.getElementById('metronomeBtn').addEventListener('click', (e) => {
   const btn = e.currentTarget;
   btn.classList.toggle('is-on', metronomeOn);
   setIconLabel(btn, metronomeOn ? 'Metronoom uit' : 'Metronoom aan');
+});
+
+// Scrol je tijdens Speel af zelf over de notenbalk, dan pauzeert het automatisch
+// meescrollen (zie scrollStaffFollow) en springt de speelpositie, 300ms nadat je
+// stopt met scrollen, mee naar de plek waar je naartoe scrolde.
+document.querySelector('.staffWrap').addEventListener('scroll', () => {
+  const wrap = document.querySelector('.staffWrap');
+  if (wrap.scrollLeft === lastProgrammaticScrollLeft) return; // onze eigen auto-scroll
+  if (!playing) return;
+  suppressAutoScroll = true;
+  clearTimeout(userScrollTimer);
+  userScrollTimer = setTimeout(() => {
+    suppressAutoScroll = false;
+    seekTo(timeAtX(wrap.scrollLeft + 34 + 20));
+  }, SCROLL_SEEK_DELAY_MS);
 });
 
 document.getElementById('playBtn').addEventListener('click', async () => {
