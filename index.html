@@ -167,22 +167,19 @@
      van id, want een opgeslagen-liedjeslijst kan meerdere voorbeeldbalkjes
      tonen. */
   #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
-  .playLabel { font-size:16px; color:var(--muted); text-align:center; margin:var(--space-2) 0 0; }
-  .playLabel.micOffHint { color:#7a5300; }
   .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
   .footNote a { color:inherit; }
 
   /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
-     moet spelen. Zelfde horizontaal-scrollende aanpak als de notenbalk, want 88
-     toetsen naast elkaar passen niet op een telefoonscherm. */
-  .keyboardWrap {
-    overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-s);
-    margin-top:var(--space-4); scrollbar-width:thin; scrollbar-color:var(--lavender) transparent;
+     moet spelen. Vast (geen scroll/sprong): alle 88 toetsen schalen gewoon mee
+     naar de beschikbare breedte. Alleen genoeg ruimte op een telefoon in
+     liggende stand of een breder scherm (zie media query onderaan), anders
+     passen 88 toetsen niet leesbaar naast elkaar en blijft 'ie verborgen. */
+  .keyboardWrap { display:none; margin-top:var(--space-4); border-radius:var(--radius-s); }
+  #keyboard { display:block; width:100%; height:auto; }
+  @media (orientation: landscape), (min-width: 700px) {
+    .keyboardWrap { display:block; }
   }
-  .keyboardWrap::-webkit-scrollbar { height:8px; }
-  .keyboardWrap::-webkit-scrollbar-track { background:transparent; }
-  .keyboardWrap::-webkit-scrollbar-thumb { background:var(--lavender); border-radius:var(--radius-pill); }
-  #keyboard { display:block; width:100%; min-width:600px; height:auto; }
   .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
 
@@ -330,9 +327,7 @@
     .card { padding: var(--space-2) var(--space-3); }
     .staffToolbar { margin-bottom: var(--space-2); }
     #staff { width: auto; min-width: 0; height: min(48vh, 250px); }
-    .playLabel { font-size: 13px; margin-top: var(--space-1); }
     .keyboardWrap { margin-top: var(--space-2); }
-    #keyboard { width: auto; min-width: 0; height: 70px; }
     .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
   }
 </style>
@@ -420,7 +415,6 @@
       <svg id="staff" viewBox="0 0 600 240"></svg>
       <div class="countInOverlay" id="countInOverlay"><span class="countInNumber" id="countInNumber"></span></div>
     </div>
-    <p class="playLabel" id="playLabel"></p>
     <div class="keyboardWrap">
       <svg id="keyboard"></svg>
     </div>
@@ -895,22 +889,38 @@ const KEYBOARD_SVG_WIDTH = KEYBOARD_WHITE_COUNT * KEY_WHITE_W;
 // die je moet spelen) op met de vingerzetting erop, net als de paarse "huidige
 // noot"-markering op de notenbalk. Geen highlight als het lied klaar is of nog
 // niet geladen.
+// De linkerhand-noot die "nu" hoort, gekoppeld aan waar de rechterhand (notes[idx])
+// op dit moment is: geen eigen klok nodig, dus werkt ook gewoon in oefenmodus.
+// Een akkoord (alleen linkerhand) licht al z'n toonhoogtes tegelijk op.
+function currentContextMidis() {
+  if (!contextNotes.length) return [];
+  const refStart = idx < notes.length ? notes[idx].start : (notes.length ? notes[notes.length - 1].start : null);
+  if (refStart === null) return [];
+  const n = contextNotes.find(cn => !cn.rest && refStart >= cn.start && refStart < cn.start + cn.dur);
+  if (!n) return [];
+  return n.chord ? n.pitches.map(p => p.midi) : [n.midi];
+}
+
 function renderKeyboard() {
   const svgEl = document.getElementById('keyboard');
   svgEl.innerHTML = '';
   svgEl.setAttribute('viewBox', `0 0 ${KEYBOARD_SVG_WIDTH} ${KEY_WHITE_H}`);
-  svgEl.style.minWidth = KEYBOARD_SVG_WIDTH + 'px';
 
   const current = idx < notes.length ? notes[idx] : null;
   const currentMidi = current ? current.midi : null;
+  const contextMidis = currentContextMidis();
+  const keyFill = (midi, whiteDefault) => {
+    if (midi === currentMidi) return '#8c73e8'; // rechterhand (R), te spelen
+    if (contextMidis.includes(midi)) return '#2dd4bf'; // linkerhand, alleen ter context
+    return whiteDefault;
+  };
 
   KEYBOARD_LAYOUT.filter(k => k.white).forEach(k => {
-    const isCurrent = k.midi === currentMidi;
     el('rect', {
       x: k.x, y: 0, width: KEY_WHITE_W - 1, height: KEY_WHITE_H, rx: 3,
-      fill: isCurrent ? '#8c73e8' : '#fff', stroke: '#2b2640', 'stroke-width': 1
+      fill: keyFill(k.midi, '#fff'), stroke: '#2b2640', 'stroke-width': 1
     }, svgEl);
-    if (isCurrent) {
+    if (k.midi === currentMidi) {
       el('text', {
         x: k.x + (KEY_WHITE_W - 1) / 2, y: KEY_WHITE_H - 14, 'font-size': 14,
         'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
@@ -918,27 +928,17 @@ function renderKeyboard() {
     }
   });
   KEYBOARD_LAYOUT.filter(k => !k.white).forEach(k => {
-    const isCurrent = k.midi === currentMidi;
     el('rect', {
       x: k.x, y: 0, width: KEY_BLACK_W, height: KEY_BLACK_H, rx: 2,
-      fill: isCurrent ? '#8c73e8' : '#2b2640'
+      fill: keyFill(k.midi, '#2b2640')
     }, svgEl);
-    if (isCurrent) {
+    if (k.midi === currentMidi) {
       el('text', {
         x: k.x + KEY_BLACK_W / 2, y: KEY_BLACK_H - 9, 'font-size': 11,
         'font-weight': 700, 'text-anchor': 'middle', fill: '#fff'
       }, svgEl).textContent = 'R' + current.finger;
     }
   });
-
-  if (currentMidi !== null) {
-    const wrap = document.querySelector('.keyboardWrap');
-    const keyInfo = KEYBOARD_LAYOUT.find(k => k.midi === currentMidi);
-    const keyW = keyInfo.white ? KEY_WHITE_W : KEY_BLACK_W;
-    const target = keyInfo.x + keyW / 2 - wrap.clientWidth / 2;
-    const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
-    wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
-  }
 }
 // Schaal van de hele notenbalk (afstand tussen noten, lijnafstand, en alle
 // lettergroottes/lijndiktes in drawGrandStaff): vergroot op verzoek, omdat de
@@ -1296,9 +1296,14 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       }
     }
 
-    const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + S(26) : yOfFn(minStep) + S(26);
-    const finger = el('text', { x, y: fingerY, 'font-size':S(13), 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
-    finger.textContent = handPrefix + n.finger;
+    // Rechterhand-vingerzetting (R1 t/m R5) staat niet meer onder de noot: dat
+    // toont het pianotoetsenbord nu al op de toets zelf. Linkerhand-vingerzetting
+    // (L1 t/m L5) blijft wel op de notenbalk staan, die staat nergens anders.
+    if (!isActiveHand) {
+      const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + S(26) : yOfFn(minStep) + S(26);
+      const finger = el('text', { x, y: fingerY, 'font-size':S(13), 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
+      finger.textContent = handPrefix + n.finger;
+    }
   }
 
   const rightAcc = { measure: -1, shown: {} };
@@ -1319,17 +1324,9 @@ function render() {
   const { playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, playing ? passedIdx : idx);
   phRect = playhead;
 
-  // Los van de SVG (die zijwaarts kan scrollen) zodat deze tekst altijd
-  // gewoon in het midden van het scherm blijft staan, ook bij een lang stuk.
-  // Staat de microfoon nog uit, dan komt die melding hier te staan in plaats van
-  // "Speel: ...": dat laatste suggereert dat spelen al zou werken.
-  const playLabelEl = document.getElementById('playLabel');
-  playLabelEl.textContent = !micOn
-    ? 'Zet eerst de microfoon aan, anders kan de app je niet horen.'
-    : idx < notes.length
-      ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
-      : 'Klaar!';
-  playLabelEl.classList.toggle('micOffHint', !micOn);
+  // Staat de microfoon nog uit, dan krijgt de microfoonknop een zachte amber
+  // rand (zie CLAUDE.md): geen aparte tekstmelding meer, dat stond nu in de
+  // weg van het pianotoetsenbord, dat immers al laat zien wat er moet gebeuren.
   document.getElementById('micBtn').classList.toggle('micOffHint', !micOn);
 
   // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.

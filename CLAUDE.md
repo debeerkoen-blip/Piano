@@ -6,13 +6,14 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 ## Huidige stand
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
-  Staat de microfoon nog uit, dan staat dat expliciet in de `playLabel` ("Zet eerst de
-  microfoon aan...", in plaats van "Speel: ...") en krijgt de microfoonknop een zachte amber
-  highlight (`.micOffHint`, dezelfde kleur als het conceptlabel, geen alarmrood: dit is een
-  herinnering, geen foutmelding), zodat je niet denkt dat spelen al werkt terwijl er nog niet
-  geluisterd wordt. Verdwijnt zodra de microfoon aan staat (`startMic()`/`render()`). Het
-  systeemvenstertje van de browser zelf ("Toestaan dat ... je microfoon gebruikt?") kan een
-  website niet stylen, dat is bewust zo (tegen misbruik).
+  Staat de microfoon nog uit, dan krijgt de microfoonknop een zachte amber highlight
+  (`.micOffHint`, geen alarmrood: dit is een herinnering, geen foutmelding), zodat je niet
+  denkt dat spelen al werkt terwijl er nog niet geluisterd wordt. Verdwijnt zodra de microfoon
+  aan staat (`startMic()`/`render()`). Het systeemvenstertje van de browser zelf ("Toestaan
+  dat ... je microfoon gebruikt?") kan een website niet stylen, dat is bewust zo (tegen
+  misbruik). Er stond hier ook een losse tekstmelding ("Speel: E4 met R3" / "Zet eerst de
+  microfoon aan..."), die is weg: het pianotoetsenbord (zie verderop) laat de te spelen toets
+  al zien, een tweede tekstuele versie van diezelfde info was overbodig.
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
@@ -29,7 +30,10 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   tijd (binnen het venster), dan kleurt 'ie alsnog groen in plaats van rood. `idx` blijft de
   echte score-pointer en bepaalt (ongewijzigd) wat het pianotoetsenbord en "Speel: ..." tonen.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
-- Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+- Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als L1 t/m L5 (linkerhand).
+  De rechterhand (R1 t/m R5) kreeg vroeger ook een label onder de noot, maar dat staat nu
+  al op het pianotoetsenbord (zie verderop), dus dat label op de notenbalk is weg: twee keer
+  dezelfde vingerzetting tonen was overbodig en gaf drukte. Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
   De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
   `STAFF_SCALE` (1,3) in `drawGrandStaff`, via de helper `S(v) = v * STAFF_SCALE`. Er zat te
   veel witruimte in de kaart t.o.v. hoe klein de notatie oogde; dit vergroot alles in verhouding
@@ -94,11 +98,18 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
 - Geen voortgangsbalk en geen "Klaar! ★★★"-melding meer onder de notenbalk. In plaats daarvan
   een pianotoetsenbord (88 toetsen, A0 t/m C8, `renderKeyboard()`) dat precies laat zien welke
-  toets en welke vinger nu aan de beurt is (de rechterhand, zoals ook op de notenbalk): de
-  huidige toets licht paars op met de vingerzetting erop, net als de "huidige noot"-markering
-  op de notenbalk. Scrollt automatisch mee zodat de huidige toets gecentreerd in beeld blijft.
-  Geen highlight meer zodra het lied klaar is (`idx >= notes.length`). XP/reeks/sterren tellen
-  nog gewoon door, alleen de tekstmelding bij het afronden is weg.
+  toets en welke vinger nu aan de beurt is (de rechterhand): de huidige toets licht paars op
+  met de vingerzetting erop, net als de "huidige noot"-markering op de notenbalk. De
+  linkerhand-noot die er op dat moment bij hoort (`currentContextMidis()`, ook bij een
+  akkoord) licht teal op, ter context, zonder vingerzetting: alleen de rechterhand wordt
+  geoefend. Geen highlight meer zodra het lied klaar is (`idx >= notes.length`). XP/reeks/sterren
+  tellen nog gewoon door, alleen de tekstmelding bij het afronden is weg.
+  Het toetsenbord staat vast: alle 88 toetsen schalen naar de beschikbare breedte in plaats van
+  op ware grootte te scrollen met een automatisch meebewegende (en dus steeds verspringende)
+  scrollpositie. 88 toetsen op ware grootte passen niet leesbaar naast elkaar op een
+  telefoonscherm in portretstand, dus daar blijft het toetsenbord verborgen (`display:none`)
+  tot de telefoon liggend gehouden wordt of het scherm breed genoeg is (media query op
+  `orientation: landscape` of `min-width: 700px`, dezelfde drempel als voor een tablet/laptop).
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `durations` (optioneel), `draft`.
 - Notenwaarden: `durations` (in tellen) laat achtste noten, gestippelde noten en halve noten toe.
   Zonder `durations` duurt elke noot één tel, zoals voorheen. Noten kunnen een mol (`Bb4`) of
