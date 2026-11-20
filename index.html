@@ -171,14 +171,29 @@
   .footNote a { color:inherit; }
 
   /* Pianotoetsenbord (88 toetsen, A0 t/m C8): toont welke toets en vinger je nu
-     moet spelen. Vast (geen scroll/sprong): alle 88 toetsen schalen gewoon mee
-     naar de beschikbare breedte. Alleen genoeg ruimte op een telefoon in
-     liggende stand of een breder scherm (zie media query onderaan), anders
-     passen 88 toetsen niet leesbaar naast elkaar en blijft 'ie verborgen. */
-  .keyboardWrap { display:none; margin-top:var(--space-4); border-radius:var(--radius-s); }
+     moet spelen. Alle 88 toetsen schalen mee naar de beschikbare breedte, geen
+     scroll/sprong. Alleen genoeg ruimte op een telefoon in liggende stand of
+     een breder scherm (zie media query onderaan), anders passen 88 toetsen
+     niet leesbaar naast elkaar en blijft 'ie verborgen.
+     Vastgezet onderaan het scherm (position:fixed) in plaats van gewoon
+     ergens midden in de meescrollende kaart: op een telefoon in liggende
+     stand is de kaart vaak hoger dan het scherm, dus zonder dit zou je tijdens
+     het spelen zelf moeten scrollen om 'm te kunnen zien, en leek het net of
+     'ie "bewoog" doordat zijn plek op het scherm niet stabiel was. Vast
+     onderaan betekent: altijd zichtbaar, altijd exact dezelfde plek.
+     main krijgt evenveel extra padding-bottom gereserveerd, anders schuift
+     deze balk over de feedbacktekst/legenda heen. */
+  .keyboardWrap { display:none; }
   #keyboard { display:block; width:100%; height:auto; }
   @media (orientation: landscape), (min-width: 700px) {
-    .keyboardWrap { display:block; }
+    .keyboardWrap {
+      display:block; position:fixed; left:0; right:0; bottom:0; z-index:15;
+      margin:0; border-radius:0; background:var(--surface); border-top:1px solid var(--border);
+      box-shadow:0 -6px 16px rgba(43,38,64,.12);
+      padding:var(--space-2) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
+    }
+    #keyboard { height:64px; width:auto; max-width:100%; margin:0 auto; }
+    main { padding-bottom:108px; }
   }
   .feedback { font-weight:600; min-height:24px; margin-top:var(--space-3); font-size:15px; }
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
@@ -327,7 +342,9 @@
     .card { padding: var(--space-2) var(--space-3); }
     .staffToolbar { margin-bottom: var(--space-2); }
     #staff { width: auto; min-width: 0; height: min(48vh, 250px); }
-    .keyboardWrap { margin-top: var(--space-2); }
+    .keyboardWrap { padding: var(--space-1) var(--space-3) max(var(--space-1), env(safe-area-inset-bottom)); }
+    #keyboard { height: 48px; }
+    main { padding-bottom: 76px; }
     .feedback { margin-top: var(--space-2); min-height: 20px; font-size: 14px; }
   }
 </style>
