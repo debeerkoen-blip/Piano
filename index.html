@@ -134,6 +134,8 @@
      tonen. */
   #staff, .previewStaff { display:block; width:100%; min-width:600px; height:auto; }
   .scrollHint { font-size:12px; color:var(--muted); margin:var(--space-1) 0 0; text-align:center; }
+  .footNote { font-size:12px; color:var(--muted); text-align:center; margin-top:var(--space-6); }
+  .footNote a { color:inherit; }
 
   .progress { height:8px; background:var(--border); border-radius:var(--radius-pill); margin-top:var(--space-4); overflow:hidden; }
   .progress div { height:100%; background:var(--ok-text); width:0; transition: width .3s; }
@@ -320,6 +322,12 @@
         <span class="tooltip" id="tip-play" role="tooltip">Speel af</span>
       </span>
       <span class="icon-btn-wrap">
+        <button type="button" class="icon-btn" id="playSoundBtn" aria-describedby="tip-play-sound" aria-label="Speel af met pianogeluid">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 4.5v15l8-7.5z"/><circle cx="18.5" cy="18" r="2.3"/><rect x="19.6" y="4" width="1.6" height="14.5" rx="0.8"/><path d="M19.6 4l3 1v2.4l-3-1z"/></svg>
+        </button>
+        <span class="tooltip" id="tip-play-sound" role="tooltip">Speel af met pianogeluid</span>
+      </span>
+      <span class="icon-btn-wrap">
         <button type="button" class="icon-btn btn-ghost" id="restart" disabled aria-describedby="tip-restart" aria-label="Opnieuw beginnen">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>
         </button>
@@ -355,6 +363,8 @@
     <div class="progress"><div id="bar"></div></div>
     <div class="feedback" id="feedback">Klik op Microfoon aan om te beginnen.</div>
   </div>
+
+  <p class="footNote">Pianoklank: opnames van de <a href="https://archive.org/details/SalamanderGrandPianoV3" target="_blank" rel="noopener">Salamander Grand Piano</a> door Alexander Holm (CC BY 3.0), via <a href="https://tonejs.github.io" target="_blank" rel="noopener">Tone.js</a>.</p>
 </main>
 
 <div class="panelBackdrop" id="panelBackdrop" hidden></div>
@@ -669,6 +679,7 @@ let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoor
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let phRect = null, liveMarker = null, liveLabel = null;
+let liveMarkerHoldUntil = 0; // laat de live-indicator minstens even staan, ook na een verkeerde noot
 
 // Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
 // cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
@@ -927,6 +938,21 @@ function render() {
   liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
 
   updateScrollHint();
+  if (notes.length) {
+    const anchorIdx = Math.min(idx, notes.length - 1);
+    scrollStaffFollow(noteX(notes[anchorIdx], anchorIdx), anchorIdx > 0);
+  }
+}
+
+// Schuift de notenbalk automatisch mee: de huidige noot komt links in beeld,
+// met nog 1 oude noot ervoor als context. hasPrevious is false bij de allereerste
+// noot, dan blijft de notenbalk op het begin staan (clef + eerste noten zichtbaar).
+function scrollStaffFollow(x, hasPrevious) {
+  const wrap = document.querySelector('.staffWrap');
+  if (!wrap) return;
+  const target = hasPrevious ? x - 34 - 20 : 0;
+  const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+  wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
 }
 
 // Toont alleen een hint als de notenbalk breder is dan wat er past.
@@ -1064,7 +1090,78 @@ function scheduleHammerNoise(when, freq) {
   scheduledSources.push(src);
 }
 
+// ---------- Echte pianosamples (Salamander Grand Piano, CC BY 3.0, via Tone.js) ----------
+// 30 opnames, elke 3 halve tonen (A, C, D#, F#, per octaaf), de rest wordt ertussen
+// gepitcht met playbackRate. Dat is de gangbare aanpak voor een lichte sampler zonder
+// library: weinig bestanden, geen hoorbaar verlies omdat de afstand tot de dichtstbije
+// opname nooit meer dan 1,5 halve toon is.
+const PIANO_SAMPLE_BASE_URL = 'https://tonejs.github.io/audio/salamander/';
+const PIANO_SAMPLE_ROOTS = [];
+for (let midi = 21; midi <= 108; midi += 3) {
+  const names = { 0: 'C', 3: 'Ds', 6: 'Fs', 9: 'A' };
+  const semitoneInOctave = ((midi - 12) % 12 + 12) % 12;
+  const octave = Math.floor((midi - 12) / 12);
+  PIANO_SAMPLE_ROOTS.push({ midi, file: `${names[semitoneInOctave]}${octave}.mp3` });
+}
+
+let pianoSampleBuffers = null;   // midi -> AudioBuffer, null zolang niet (succesvol) geladen
+let pianoSamplesPromise = null;  // zodat we maar één keer laden/downloaden
+
+async function loadPianoSamples(ctx) {
+  if (pianoSamplesPromise) return pianoSamplesPromise;
+  pianoSamplesPromise = Promise.all(
+    PIANO_SAMPLE_ROOTS.map(async (root) => {
+      const res = await fetch(PIANO_SAMPLE_BASE_URL + root.file);
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      return [root.midi, audioBuffer];
+    })
+  ).then(entries => {
+    pianoSampleBuffers = new Map(entries);
+    return pianoSampleBuffers;
+  }).catch(err => {
+    console.warn('Pianosamples konden niet geladen worden, val terug op synthese.', err);
+    pianoSampleBuffers = null;
+    return null;
+  });
+  return pianoSamplesPromise;
+}
+
+function nearestSampleRoot(midi) {
+  return PIANO_SAMPLE_ROOTS.reduce((best, root) =>
+    Math.abs(root.midi - midi) < Math.abs(best.midi - midi) ? root : best
+  );
+}
+
+function scheduleSampledNote(midi, when, duration) {
+  const root = nearestSampleRoot(midi);
+  const buffer = pianoSampleBuffers.get(root.midi);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = Math.pow(2, (midi - root.midi) / 12);
+
+  const release = 0.12; // tijd om de snaar te dempen, zoals de hamerdemper bij het loslaten
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(1, when);
+  gain.gain.setValueAtTime(1, when + duration);
+  gain.gain.linearRampToValueAtTime(0, when + duration + release);
+
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(when);
+  src.stop(when + duration + release + 0.05);
+  scheduledSources.push(src);
+}
+
 function scheduleNoteSound(midi, when, duration) {
+  if (pianoSampleBuffers) {
+    scheduleSampledNote(midi, when, duration);
+  } else {
+    scheduleSynthesizedNote(midi, when, duration);
+  }
+}
+
+function scheduleSynthesizedNote(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   // Lichte, willekeurige onzuiverheid per noot, zoals een snaar die nooit perfect gestemd is.
   const detuneCents = (Math.random() - 0.5) * 3;
@@ -1098,31 +1195,58 @@ function scheduleNoteSound(midi, when, duration) {
   scheduleHammerNoise(when, freq);
 }
 
-function startPlay() {
+// Houdt de twee afspeelknoppen (met en zonder geluid geforceerd) in dezelfde
+// visuele toestand: beide zijn tijdens het afspelen de stopknop.
+function setPlayButtonsState(isPlaying) {
+  document.getElementById('playBtn').textContent = isPlaying ? 'Stop' : 'Speel af';
+  const soundBtn = document.getElementById('playSoundBtn');
+  soundBtn.textContent = isPlaying ? '⏹' : '▶🎵';
+  soundBtn.title = soundBtn.ariaLabel = isPlaying ? 'Stop' : 'Speel af met pianogeluid';
+}
+
+// Houdt de twee afspeelknoppen (met en zonder geluid geforceerd) in dezelfde
+// visuele toestand: beide zijn tijdens het afspelen de stopknop.
+function setPlayButtonsState(isPlaying) {
+  const playBtnEl = document.getElementById('playBtn');
+  playBtnEl.innerHTML = isPlaying ? ICON_STOP : ICON_PLAY;
+  playBtnEl.classList.toggle('is-on', isPlaying);
+  setIconLabel(playBtnEl, isPlaying ? 'Stop' : 'Speel af');
+
+  const soundBtnEl = document.getElementById('playSoundBtn');
+  soundBtnEl.innerHTML = isPlaying ? ICON_STOP : ICON_PLAY_SOUND;
+  soundBtnEl.classList.toggle('is-on', isPlaying);
+  setIconLabel(soundBtnEl, isPlaying ? 'Stop' : 'Speel af met pianogeluid');
+}
+
+function startPlay(forceSound = false) {
   stopPlay(false);
   resetNoteDetection();
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   playing = true;
   startT = performance.now();
-  const playBtnEl = document.getElementById('playBtn');
-  playBtnEl.innerHTML = ICON_STOP;
-  playBtnEl.classList.add('is-on');
-  setIconLabel(playBtnEl, 'Stop');
+  setPlayButtonsState(true);
   document.getElementById('restart').disabled = true;
   setFeedback('Tel mee...', '');
   render();
   updateStats();
 
-  if (document.getElementById('soundToggle').checked && audioCtx) {
+  if ((forceSound || document.getElementById('soundToggle').checked) && audioCtx) {
     const beatSec = beatMs / 1000;
-    const audioStart = audioCtx.currentTime;
     // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
     // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
     // tussen de handen te horen.
-    [...notes, ...contextNotes].forEach(n => {
-      if (n.rest) return;
-      scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
+    const noteList = [...notes, ...contextNotes].filter(n => !n.rest);
+    // De pianosamples zijn meestal al (via startMic) op de achtergrond aan het laden
+    // of al klaar; we wachten erop zodat de eerste keer afspelen niet half synthetisch
+    // en half met samples klinkt. Mislukt het laden, dan valt loadPianoSamples terug
+    // op null en gebruiken we de synthese.
+    loadPianoSamples(audioCtx).finally(() => {
+      if (!playing) return; // intussen gestopt, niet meer plannen
+      const audioStart = audioCtx.currentTime;
+      noteList.forEach(n => {
+        scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
+      });
     });
   }
 
@@ -1161,6 +1285,7 @@ function tick(now) {
     }
     phRect.setAttribute('x', xAtTime(t) - 1.5);
     phRect.setAttribute('opacity', 1);
+    scrollStaffFollow(xAtTime(t), idx > 0);
   }
   rafId = requestAnimationFrame(tick);
 }
@@ -1172,10 +1297,7 @@ function stopPlay(completed) {
   rafId = null;
   const was = playing;
   playing = false;
-  const playBtnEl = document.getElementById('playBtn');
-  playBtnEl.innerHTML = ICON_PLAY;
-  playBtnEl.classList.remove('is-on');
-  setIconLabel(playBtnEl, 'Speel af');
+  setPlayButtonsState(false);
   if (!was) return;
   if (completed) finish();
   else setFeedback('Gestopt.', '');
@@ -1211,6 +1333,7 @@ async function startMic() {
       audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
     });
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    loadPianoSamples(audioCtx); // alvast op de achtergrond, klaar voordat "Speel af" ze nodig heeft
     const src = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
@@ -1376,10 +1499,12 @@ function updateLiveMarker(f1, f2, midi) {
   }
 
   if (shownMidi === null) {
+    if (performance.now() < liveMarkerHoldUntil) return; // nog even laten staan
     liveMarker.setAttribute('opacity', 0);
     liveLabel.setAttribute('opacity', 0);
     return;
   }
+  liveMarkerHoldUntil = performance.now() + 500;
 
   const noteLabel = midiToLabel(shownMidi);
   const step = parseNote(noteLabel).step;
@@ -1795,6 +1920,7 @@ function setIconLabel(btn, label) {
 }
 const ICON_PLAY = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 const ICON_STOP = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+const ICON_PLAY_SOUND = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3 4.5v15l8-7.5z"/><circle cx="18.5" cy="18" r="2.3"/><rect x="19.6" y="4" width="1.6" height="14.5" rx="0.8"/><path d="M19.6 4l3 1v2.4l-3-1z"/></svg>';
 
 // ---------- Panelen: Instellingen, Zoeken, Lied toevoegen ----------
 // Niet-modaal: de rest van de pagina blijft bereikbaar, maar een klik op de
@@ -1900,6 +2026,12 @@ document.getElementById('playBtn').addEventListener('click', async () => {
   if (playing) { stopPlay(false); return; }
   const ok = await startMic();
   if (ok) startPlay();
+});
+
+document.getElementById('playSoundBtn').addEventListener('click', async () => {
+  if (playing) { stopPlay(false); return; }
+  const ok = await startMic();
+  if (ok) startPlay(true);
 });
 
 document.getElementById('restart').addEventListener('click', () => {
