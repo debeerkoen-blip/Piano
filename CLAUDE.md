@@ -6,9 +6,10 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 ## Huidige stand
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
-  Staat de microfoon nog uit, dan zegt de feedbacktekst dat expliciet ("Zet eerst de
-  microfoon aan...") in plaats van gewoon "Speel de eerste noot" te suggereren: dat laatste
-  deed niets zolang er niet geluisterd werd, zonder duidelijke reden waarom.
+  Staat de microfoon nog uit, dan staat dat expliciet in de `playLabel` ("Zet eerst de
+  microfoon aan...", in plaats van "Speel: ...") en krijgt de microfoonknop een rode rand
+  (`.micOffHint`), zodat je niet denkt dat spelen al werkt terwijl er nog niet geluisterd
+  wordt. Verdwijnt zodra de microfoon aan staat (`startMic()`/`render()`).
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
@@ -30,7 +31,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   herhaling). Nog niet geïmplementeerd: samengebalkte achtste noten (elke achtste krijgt nu een
   los vlaggetje) en een echte toonsoort/voortekening (elke verhoging/verlaging staat los bij de
   noot, er is geen mol- of kruisvoortekening aan het begin van de balk).
-- Speel af: een balk loopt over de noten met aftellen (4 tellen).
+- Speel af: een balk loopt over de noten met aftellen (4 tellen). Tijdens het aftellen zelf
+  staat er een zachte, halfdoorzichtige lay-over (`#countInOverlay`) met een groot cijfer
+  boven op de notenbalk, in plaats van alleen tekst in de feedback.
 - Geluid bij "Speel af": echte pianosamples (Salamander Grand Piano, CC BY 3.0, opnames van
   Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke
   3 halve tonen), de tussenliggende toonhoogtes worden gepitcht met `playbackRate`. Een noot
