@@ -7,9 +7,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
   Staat de microfoon nog uit, dan staat dat expliciet in de `playLabel` ("Zet eerst de
-  microfoon aan...", in plaats van "Speel: ...") en krijgt de microfoonknop een rode rand
-  (`.micOffHint`), zodat je niet denkt dat spelen al werkt terwijl er nog niet geluisterd
-  wordt. Verdwijnt zodra de microfoon aan staat (`startMic()`/`render()`).
+  microfoon aan...", in plaats van "Speel: ...") en krijgt de microfoonknop een zachte amber
+  highlight (`.micOffHint`, dezelfde kleur als het conceptlabel, geen alarmrood: dit is een
+  herinnering, geen foutmelding), zodat je niet denkt dat spelen al werkt terwijl er nog niet
+  geluisterd wordt. Verdwijnt zodra de microfoon aan staat (`startMic()`/`render()`). Het
+  systeemvenstertje van de browser zelf ("Toestaan dat ... je microfoon gebruikt?") kan een
+  website niet stylen, dat is bewust zo (tegen misbruik).
 - "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
   een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
   `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
@@ -46,9 +49,11 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - De notenbalk scrollt automatisch mee met de voortgang. Tijdens "Speel af" staat de rode
   speelstreep vast op 1/3 van het zichtbare stuk (`PLAYHEAD_FRACTION`, in `scrollStaffFollowPlayhead()`):
   de notenbalk schuift daar continu onderdoor, als een pianorol. Scrol je zelf tijdens het
-  spelen, dan pauzeert het automatisch meescrollen; 300ms na het loslaten springt de
-  speelpositie naar wat er dan onder die 1/3-lijn staat (`seekTo()`, zonder de score te
-  resetten). In oefenmodus (geen speelstreep) komt de huidige noot nog links in beeld met 1
+  spelen, dan bevriest `tick()` meteen (geen noten die stiekem als gemist tellen) en stopt
+  het geluid van vóór het slepen direct, in plaats van onhoorbaar/niet-gesynchroniseerd door
+  te spelen; 300ms na het loslaten springt de speelpositie naar wat er dan onder die
+  1/3-lijn staat (`seekTo()`, zonder de score te resetten) en speelt het geluid vanaf daar
+  verder. In oefenmodus (geen speelstreep) komt de huidige noot nog links in beeld met 1
   oude noot ervoor als context (`scrollStaffFollow()`, de oorspronkelijke functie).
 - De live-indicator blijft minstens een halve seconde zichtbaar na het laatste signaal, in
   plaats van meteen te verdwijnen zodra de toon wegvalt.
