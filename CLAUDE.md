@@ -59,3 +59,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Schrijf teksten in de app in het Nederlands.
 - Geen em dashes in teksten.
 - Verander de nootdata alleen na controle tegen een bron.
+- Stuurt de gebruiker een foto of pdf van bladmuziek met een vraag als "voeg dit toe aan de app"
+  (of vergelijkbaar), dan is de afspraak: noten (en vingerzetting/maatindeling waar zichtbaar)
+  nauwkeurig aflezen (zo nodig met pixelmetingen op de afbeelding, niet op het oog schatten), het
+  stuk toevoegen aan `SONGS` in `index.html` met `draft: true` en een opmerking over wat nog
+  onzeker is (bijvoorbeeld een akkoord dat vereenvoudigd is, of een cijfer dat niet overal stond),
+  testen in de browser, en committen/pushen naar de werkbranch van de sessie.
