@@ -57,10 +57,12 @@
     <div class="controls">
       <select id="song"></select>
       <button id="micBtn">Microfoon aan</button>
+      <button id="calibBtn">Stem af op C</button>
       <button id="playBtn">Speel af</button>
       <button id="restart">Opnieuw</button>
       <label class="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
       <span class="heard" id="heard">Gehoord: -</span>
+      <span class="heard" id="calibInfo"></span>
     </div>
   </div>
 
@@ -265,20 +267,32 @@ function finish() {
 // ---------- Speel af: balk loopt over de noten ----------
 let scheduledOscillators = [];
 
+// Benadering van een pianoklank: grondtoon plus een paar boventonen,
+// elk met een korte aanzet en een exponentieel wegstervende klank.
+// Geen echte pianosample, maar klinkt wel voller dan een kale sinustoon.
+const PIANO_HARMONICS = [
+  { mult: 1, level: 0.22 },
+  { mult: 2, level: 0.10 },
+  { mult: 3, level: 0.05 },
+  { mult: 4, level: 0.025 }
+];
+
 function scheduleNoteSound(midi, when, duration) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
-  gain.gain.setValueAtTime(0, when);
-  gain.gain.linearRampToValueAtTime(0.2, when + 0.015);
-  gain.gain.linearRampToValueAtTime(0, when + duration);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start(when);
-  osc.stop(when + duration + 0.02);
-  scheduledOscillators.push(osc);
+  PIANO_HARMONICS.forEach(h => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq * h.mult;
+    gain.gain.setValueAtTime(0, when);
+    gain.gain.linearRampToValueAtTime(h.level, when + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + duration + 0.05);
+    scheduledOscillators.push(osc);
+  });
 }
 
 function startPlay() {
@@ -352,6 +366,7 @@ function stopPlay(completed) {
 
 // ---------- Microfoon en toonhoogte ----------
 let audioCtx = null, analyser = null, buf = null, micOn = false, listenTimer = null;
+let calibrationOffset = 0; // afwijking in halve tonen t.o.v. A4 = 440 Hz, bepaald via "Stem af op C"
 
 function micErrorText(err) {
   switch (err.name) {
@@ -438,7 +453,7 @@ function listen() {
     document.getElementById('heard').textContent = 'Gehoord: -';
     return;
   }
-  const midi = Math.round(69 + 12 * Math.log2(f / 440));
+  const midi = Math.round(69 + 12 * Math.log2(f / 440) - calibrationOffset);
   document.getElementById('heard').textContent = `Gehoord: ${midiToLabel(midi)}`;
 
   if (midi === candidate) {
@@ -457,6 +472,58 @@ function listen() {
   }
 }
 
+// ---------- Kalibratie: gebruiker speelt een C, wij stemmen de herkenning daarop af ----------
+async function calibrate() {
+  const ok = await startMic();
+  if (!ok) return;
+
+  // Spel-herkenning even pauzeren zodat kalibratie niet per ongeluk als noot telt.
+  if (listenTimer) { clearInterval(listenTimer); listenTimer = null; }
+
+  const calibBtn = document.getElementById('calibBtn');
+  calibBtn.disabled = true;
+  setFeedback('Speel een C en houd hem twee seconden vast...', '');
+
+  const samples = [];
+  const duration = 2200;
+  const start = performance.now();
+  await new Promise(resolve => {
+    const iv = setInterval(() => {
+      analyser.getFloatTimeDomainData(buf);
+      const f = detectPitch(buf, audioCtx.sampleRate);
+      if (f) samples.push(f);
+      if (performance.now() - start > duration) {
+        clearInterval(iv);
+        resolve();
+      }
+    }, 60);
+  });
+
+  listenTimer = setInterval(listen, 60);
+  calibBtn.disabled = false;
+
+  if (samples.length < 6) {
+    setFeedback('Geen stabiele toon gehoord. Speel de C nog eens duidelijk en probeer opnieuw.', 'bad');
+    return;
+  }
+
+  samples.sort((a, b) => a - b);
+  const freq = samples[Math.floor(samples.length / 2)]; // mediaan, minder gevoelig voor uitschieters
+  const rawMidi = 69 + 12 * Math.log2(freq / 440);
+  const nearestC = Math.round(rawMidi / 12) * 12; // C-noten liggen op veelvouden van 12
+  const offset = rawMidi - nearestC;
+
+  if (Math.abs(offset) > 1) {
+    setFeedback('Dat klonk niet als een C. Probeer opnieuw.', 'bad');
+    return;
+  }
+
+  calibrationOffset = offset;
+  const cents = Math.round(offset * 100);
+  document.getElementById('calibInfo').textContent = `Kalibratie: ${cents >= 0 ? '+' : ''}${cents} cent`;
+  setFeedback('Gekalibreerd op jouw piano. Je kunt verder oefenen.', 'ok');
+}
+
 // ---------- Knoppen ----------
 const songSelect = document.getElementById('song');
 SONGS.forEach((s, i) => {
@@ -471,6 +538,8 @@ document.getElementById('micBtn').addEventListener('click', async () => {
   const ok = await startMic();
   if (ok) setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
 });
+
+document.getElementById('calibBtn').addEventListener('click', calibrate);
 
 document.getElementById('playBtn').addEventListener('click', async () => {
   if (playing) { stopPlay(false); return; }
