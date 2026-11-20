@@ -13,13 +13,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
 - Liederen staan in de array `SONGS`: `notes`, `fingers`, `bpm`, `draft`.
-- Zoekkaart onder de notenbalk: doorzoekt de gratis Openopus-API (geen sleutel nodig) op componist en titel van klassieke werken. Geeft alleen titel, componist en periode terug, geen noten. Elk resultaat linkt naar IMSLP om de partituur zelf op te zoeken.
+- Zoekkaart onder de notenbalk: opent een zoekopdracht op IMSLP (publiek domein) in een nieuw tabblad. Geen eigen API-aanroep: Openopus en IMSLP sturen geen CORS-header mee, dus een fetch vanuit de browser wordt altijd geblokkeerd. Getest met een headless browser; de linknavigatie werkt, geen noten of metadata worden automatisch overgenomen.
 
 ## Let op
 - Ode an de vreugde: noten en vingerzetting zijn uit het hoofd ingevuld, nog niet gecontroleerd.
 - Gymnopédie nr. 1: concept (`draft: true`). Controleer tegen de partituur op IMSLP (publiek domein) voordat je die gebruikt.
 - Nog niet getest met een echte piano. Test met microfoon in een rustige kamer.
-- Zoekkaart (Openopus): nog niet live getest, want de ontwikkelomgeving had geen toegang tot externe internethosts. Test zelf of de zoekfunctie werkt zodra je de pagina opent, en controleer of het veldformaat van de API (titel, componist, periode) nog klopt.
+- Zoekkaart: IMSLP laat soms een "bevestig dat je geen bot bent"-pagina zien in plaats van direct de zoekresultaten. Dat is IMSLP's eigen bot-bescherming, geen fout in de app.
 
 ## Mogelijke volgende stappen
 1. Testen op telefoon en laptop. Timing-venster en detectiedrempels afstellen.

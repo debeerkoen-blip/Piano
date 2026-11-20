@@ -106,12 +106,6 @@
   .searchCard { margin-top:var(--space-6); }
   .searchCard h2 { margin:0 0 var(--space-1); font-size:17px; }
   .searchRow input { flex:1 1 200px; min-width:0; }
-  #musicResults { margin-top: var(--space-2); }
-  .resultItem { padding:var(--space-3) 0; border-bottom:1px solid var(--border); }
-  .resultItem:last-child { border-bottom:none; }
-  .resultMeta { font-size:13px; color:var(--muted); margin-top:2px; }
-  .resultLink { font-size:13px; color:var(--accent-ring); font-weight:600; text-decoration:none; display:inline-block; margin-top:var(--space-1); }
-  .resultLink:hover { text-decoration:underline; }
 
   :focus-visible { outline:2px solid var(--accent-ring); outline-offset:2px; }
 
@@ -197,12 +191,11 @@
 
   <div class="card searchCard">
     <h2>Zoek klassieke stukken</h2>
-    <p class="sub">Doorzoek een gratis, open databank van klassieke componisten en werken (Openopus). Dit levert alleen titel en componist, nog geen speelbare noten. Zoek de partituur zelf op via de IMSLP-link, net als bij Gymnopédie.</p>
+    <p class="sub">Zoek een componist of titel op in IMSLP, een gratis, publiek-domein bibliotheek van klassieke partituren. De zoekresultaten openen in een nieuw tabblad. Noten voor SONGS worden hier niet automatisch overgenomen, dat gebeurt alleen na controle tegen de partituur.</p>
     <div class="groupRow searchRow">
-      <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin, nocturne">
-      <button id="musicSearchBtn">Zoek</button>
+      <input id="musicSearch" type="text" placeholder="Bijvoorbeeld: Chopin nocturne">
+      <button id="musicSearchBtn">Zoek op IMSLP</button>
     </div>
-    <div id="musicResults"></div>
   </div>
 </main>
 
@@ -904,86 +897,14 @@ async function calibrate() {
   setFeedback('Gekalibreerd op jouw piano. Je kunt verder oefenen.', 'ok');
 }
 
-// ---------- Zoeken naar klassieke stukken (Openopus, gratis en zonder sleutel) ----------
-// Dit geeft alleen titel, componist en periode terug, geen speelbare noten.
-// Voor de partituur zelf verwijzen we door naar IMSLP (publiek domein).
-// Noten voor SONGS worden hier nooit automatisch ingevuld: dat gebeurt alleen na controle tegen een bron.
-const EPOCH_NL = {
-  'Medieval': 'Middeleeuws',
-  'Renaissance': 'Renaissance',
-  'Baroque': 'Barok',
-  'Classical': 'Klassiek',
-  'Early Romantic': 'Vroeg-romantisch',
-  'Romantic': 'Romantisch',
-  'Late Romantic': 'Laat-romantisch',
-  'Impressionist': 'Impressionistisch',
-  '20th Century': '20e eeuw',
-  'Post-War': 'Naoorlogs',
-  '21st Century': '21e eeuw',
-  'Early Modern': 'Vroegmodern'
-};
-const GENRE_NL = {
-  'Orchestral': 'Orkest',
-  'Vocal': 'Vocaal',
-  'Chamber': 'Kamermuziek',
-  'Keyboard': 'Klavier',
-  'Stage': 'Toneel en opera'
-};
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-}
-
-async function searchMusic(term) {
-  const resultsEl = document.getElementById('musicResults');
-  resultsEl.textContent = 'Zoeken...';
-  let data;
-  try {
-    const res = await fetch(`https://api.openopus.org/work/search/${encodeURIComponent(term)}.json`);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    data = await res.json();
-  } catch (err) {
-    resultsEl.textContent = 'Kan de muziekdatabank niet bereiken. Controleer je internetverbinding en probeer het opnieuw.';
-    return;
-  }
-
-  const works = (data && data.works) || [];
-  if (works.length === 0) {
-    resultsEl.textContent = 'Niets gevonden. Probeer een andere naam of titel.';
-    return;
-  }
-
-  resultsEl.innerHTML = '';
-  works.slice(0, 15).forEach(w => {
-    const composerName = (w.composer && (w.composer.complete_name || w.composer.name)) || 'Onbekende componist';
-    const epoch = w.composer && w.composer.epoch ? (EPOCH_NL[w.composer.epoch] || w.composer.epoch) : '';
-    const genre = w.genre ? (GENRE_NL[w.genre] || w.genre) : '';
-    const meta = [epoch, genre].filter(Boolean).join(' · ');
-
-    const item = document.createElement('div');
-    item.className = 'resultItem';
-
-    const title = document.createElement('div');
-    title.innerHTML = `<b>${escapeHtml(w.title || 'Zonder titel')}</b> · ${escapeHtml(composerName)}`;
-    item.appendChild(title);
-
-    if (meta) {
-      const metaEl = document.createElement('div');
-      metaEl.className = 'resultMeta';
-      metaEl.textContent = meta;
-      item.appendChild(metaEl);
-    }
-
-    const link = document.createElement('a');
-    link.className = 'resultLink';
-    link.href = `https://imslp.org/wiki/Special:Search?search=${encodeURIComponent((w.title || '') + ' ' + composerName)}`;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.textContent = 'Zoek partituur op IMSLP';
-    item.appendChild(link);
-
-    resultsEl.appendChild(item);
-  });
+// ---------- Zoeken naar klassieke stukken op IMSLP (gratis, publiek domein) ----------
+// Geen eigen databank-oproep: Openopus en IMSLP sturen geen CORS-header mee, dus een
+// fetch vanuit de browser wordt altijd geblokkeerd. In plaats daarvan openen we de
+// IMSLP-zoekpagina zelf in een nieuw tabblad, dat is een gewone linknavigatie.
+// Noten voor SONGS worden hier nooit overgenomen: dat gebeurt alleen na controle tegen de partituur.
+function searchMusic(term) {
+  const url = `https://imslp.org/wiki/Special:Search?search=${encodeURIComponent(term)}&fulltext=Search`;
+  window.open(url, '_blank', 'noopener');
 }
 
 document.getElementById('musicSearchBtn').addEventListener('click', () => {
