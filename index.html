@@ -92,6 +92,18 @@
     border-radius:var(--radius-pill); padding:0 var(--space-3);
   }
 
+  .volLabel { font-size:13px; color:var(--muted); }
+  .volMeter {
+    position:relative; width:140px; height:10px; border-radius:var(--radius-pill);
+    background:var(--border); overflow:hidden;
+  }
+  .volMeterFill { height:100%; width:0%; background:#2dd4bf; transition:width .05s linear; }
+  .volMeterFill.loud { background:#f5a623; }
+  .volMeterThreshold {
+    position:absolute; top:0; bottom:0; width:2px; background:rgba(43,38,64,.35);
+    left:16%; /* komt overeen met RMS_THRESHOLD op een schaal van 0 tot 0.05 */
+  }
+
   .soundToggle {
     display:flex; align-items:center; gap:var(--space-2); font-size:14px; color:var(--ink); cursor:pointer;
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-pill);
@@ -179,6 +191,13 @@
         <div class="groupRow">
           <span class="pill" id="heard">Gehoord: -</span>
           <span class="pill" id="calibInfo"></span>
+        </div>
+        <div class="groupRow">
+          <span class="volLabel">Volume</span>
+          <div class="volMeter" id="volMeter">
+            <div class="volMeterFill" id="volMeterFill"></div>
+            <div class="volMeterThreshold"></div>
+          </div>
         </div>
       </div>
 
@@ -673,12 +692,17 @@ async function startMic() {
   }
 }
 
+// Geluidsniveau van een meetbuffer (RMS, root mean square).
+const RMS_THRESHOLD = 0.008; // onder dit niveau geldt het als stilte
+function computeRms(b) {
+  let sum = 0;
+  for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
+  return Math.sqrt(sum / b.length);
+}
+
 // Autocorrelatie: geeft de grondfrequentie terug, of null bij stilte/onzeker signaal.
 function detectPitch(b, sr) {
-  let rms = 0;
-  for (let i = 0; i < b.length; i++) rms += b[i] * b[i];
-  rms = Math.sqrt(rms / b.length);
-  if (rms < 0.008) return null;
+  if (computeRms(b) < RMS_THRESHOLD) return null;
 
   const minLag = Math.floor(sr / 1000);
   const maxLag = Math.floor(sr / 80);
@@ -710,10 +734,7 @@ function detectPitch(b, sr) {
 // YIN: tweede, onafhankelijke toonhoogtedetector (De Cheveigne & Kawahara, 2002).
 // Geeft de grondfrequentie terug, of null bij stilte/onzeker signaal.
 function detectPitchYIN(b, sr) {
-  let rms = 0;
-  for (let i = 0; i < b.length; i++) rms += b[i] * b[i];
-  rms = Math.sqrt(rms / b.length);
-  if (rms < 0.008) return null;
+  if (computeRms(b) < RMS_THRESHOLD) return null;
 
   const minLag = Math.floor(sr / 1000);
   const maxLag = Math.floor(sr / 80);
@@ -773,6 +794,18 @@ function resetNoteDetection() {
   noteSilenceSince = 0;
 }
 
+// ---------- Volumemeter: laat zien of er überhaupt geluid binnenkomt ----------
+// Los van toonhoogtedetectie, zodat je "geen geluid" kunt onderscheiden van
+// "wel geluid, maar geen duidelijke toonhoogte".
+const VOL_METER_MAX = 0.05; // schaal waarop de meter de volle breedte haalt
+function updateVolMeter(rms) {
+  const fill = document.getElementById('volMeterFill');
+  if (!fill) return;
+  const pct = Math.min(100, (rms / VOL_METER_MAX) * 100);
+  fill.style.width = pct + '%';
+  fill.classList.toggle('loud', rms >= RMS_THRESHOLD);
+}
+
 // ---------- Live-indicator: toont wat de microfoon echt hoort, op de notenbalk ----------
 // Groen/teal = beide detectoren eens (betrouwbaar). Amber = maar één detector hoorde iets,
 // of ze zijn het oneens (onzeker, bijvoorbeeld door ruis of een octaaffout).
@@ -812,6 +845,7 @@ function updateLiveMarker(f1, f2, midi) {
 function listen() {
   if (!analyser) return;
   analyser.getFloatTimeDomainData(buf);
+  updateVolMeter(computeRms(buf));
   const f1 = detectPitch(buf, audioCtx.sampleRate);
   const f2 = detectPitchYIN(buf, audioCtx.sampleRate);
 
@@ -868,6 +902,7 @@ async function calibrate() {
   await new Promise(resolve => {
     const iv = setInterval(() => {
       analyser.getFloatTimeDomainData(buf);
+      updateVolMeter(computeRms(buf));
       const f = detectPitch(buf, audioCtx.sampleRate);
       if (f) samples.push(f);
       updateLiveMarker(f, null, null);
