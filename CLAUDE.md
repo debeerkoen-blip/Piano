@@ -9,6 +9,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
 - Speel af: een balk loopt over de noten met aftellen (4 tellen).
+- Geluid bij "Speel af": echte pianosamples (Salamander Grand Piano, CC BY 3.0, opnames van
+  Alexander Holm, gehost via Tone.js op `tonejs.github.io/audio/salamander/`). 30 opnames (elke
+  3 halve tonen), de tussenliggende toonhoogtes worden gepitcht met `playbackRate`. Een noot
+  stopt na haar eigen tel-duur met een korte fade (demper), niet pas als de hele opname is
+  uitgeklonken. Lukt het laden niet (geen internet, host geblokkeerd), dan valt de app terug op
+  de oudere synthetische pianoklank (oscillators met boventonen, inharmoniciteit en een
+  hameraanslag), zonder dat "Speel af" stopt. Bronvermelding staat onderaan de pagina.
 - Oefenmodus: alleen toonhoogte, zonder tijd.
 - Niveau (Beginner/Medior/Advanced, `DIFFICULTIES`): bepaalt het tijdvenster, de drempel voor een perfecte timingbonus, en of alleen de exacte octaaf telt (advanced) of elke octaaf van dezelfde toon (beginner/medior).
 - XP, reeksbonus, sterren per lied. Punten per noot zijn opgesplitst in toonpunten en timingpunten, zichtbaar in de feedbacktekst.
@@ -44,6 +51,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   nog geen akkoorden, dus dat is teruggebracht tot één noot (C naar F, als V-I slotcadens).
   Controleer tegen de partituur voordat je 'm serieus oefent.
 - Nog niet getest met een echte piano. Test met microfoon in een rustige kamer.
+- De pianosamples komen van `tonejs.github.io`. In een gesandboxde devomgeving (zoals deze
+  cloud-sessie) moet dat host expliciet aan de netwerktoegang zijn toegevoegd, anders faalt de
+  fetch stil en hoor je de oudere synthetische klank.
 - Zoekkaart: IMSLP laat soms een "bevestig dat je geen bot bent"-pagina zien in plaats van direct de zoekresultaten. Dat is IMSLP's eigen bot-bescherming, geen fout in de app.
 
 ## Mogelijke volgende stappen
