@@ -834,26 +834,34 @@ function el(tag, attrs, parent = staff) {
   parent.appendChild(e);
   return e;
 }
-const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
-const yOfBass = step => 330 - (step - 18) * 10; // G2 zit op de onderste lijn
-const xOf = i => 110 + i * 34;
+// Schaal van de hele notenbalk (afstand tussen noten, lijnafstand, en alle
+// lettergroottes/lijndiktes in drawGrandStaff): vergroot op verzoek, omdat de
+// notatie anders te klein oogde t.o.v. de rest van de kaart. Hoger zetten maakt
+// alles groter, maar een lang stuk heeft dan ook eerder horizontaal scrollen nodig
+// (elke noot neemt meer ruimte in).
+const STAFF_SCALE = 1.3;
+const STAFF_X0 = 110 * STAFF_SCALE;     // linkermarge vóór de eerste noot
+const NOTE_SPACING = 34 * STAFF_SCALE;  // afstand tussen twee noten/tellen
+const yOf = step => (170 - (step - 30) * 10) * STAFF_SCALE; // E4 zit op de onderste lijn
+const yOfBass = step => (330 - (step - 18) * 10) * STAFF_SCALE; // G2 zit op de onderste lijn
+const xOf = i => STAFF_X0 + i * NOTE_SPACING;
 
 // X-positie van een noot. Bij een lied zonder linkerhand staan de noten gewoon
 // even ver uit elkaar op volgorde (xOf). Heeft een lied wel een linkerhand, dan
 // moeten beide handen op dezelfde tel verticaal uitgelijnd staan, dus dan telt
 // de echte teltijd (note.start) in plaats van de positie in de rij.
 function noteX(note, i) {
-  return song.left ? (110 + note.start * 34) : xOf(i);
+  return song.left ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
 }
 
 // X-positie van de speelstreep op tijdstip t (in tellen).
 function xAtTime(t) {
-  if (song.left) return 110 + Math.max(0, t) * 34;
+  if (song.left) return STAFF_X0 + Math.max(0, t) * NOTE_SPACING;
   if (!notes.length) return xOf(0);
   let i = 0;
   while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
   const cur = notes[i];
-  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + 34;
+  const nextX = i + 1 < notes.length ? xOf(i + 1) : xOf(i) + NOTE_SPACING;
   const frac = cur.dur > 0 ? Math.min(1, Math.max(0, (t - cur.start) / cur.dur)) : 0;
   return xOf(i) + frac * (nextX - xOf(i));
 }
@@ -861,9 +869,9 @@ function xAtTime(t) {
 // Omgekeerde van xAtTime/noteX: de teltijd die bij een x-positie hoort. Gebruikt
 // om te bepalen waar de speler naartoe heeft gescrold tijdens Speel af.
 function timeAtX(x) {
-  if (song.left) return Math.max(0, (x - 110) / 34);
+  if (song.left) return Math.max(0, (x - STAFF_X0) / NOTE_SPACING);
   if (!notes.length) return 0;
-  const i = Math.round((x - 110) / 34);
+  const i = Math.round((x - STAFF_X0) / NOTE_SPACING);
   const clamped = Math.max(0, Math.min(notes.length - 1, i));
   return notes[clamped].start;
 }
@@ -964,8 +972,12 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   svgEl.innerHTML = '';
   const previewMode = activeIdx === null;
   const hasLeft = leftNotes && leftNotes.length > 0;
-  const svgHeight = hasLeft ? 420 : 240;
-  const staffTop = 90, staffBottom = hasLeft ? 330 : 170;
+  // S schaalt een los pixel-/lettergroottegetal mee met STAFF_SCALE. yOf/yOfBass/
+  // xOf/STAFF_X0/NOTE_SPACING zijn al geschaald; alle andere maten hier (lijndiktes,
+  // lettergroottes, marges) lopen via S zodat de hele notenbalk in verhouding blijft.
+  const S = v => v * STAFF_SCALE;
+  const svgHeight = S(hasLeft ? 420 : 240);
+  const staffTop = S(90), staffBottom = S(hasLeft ? 330 : 170);
 
   const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
   const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
@@ -977,38 +989,38 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   // (xOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
   // uitgelijnd staan, dus dan telt de echte teltijd (note.start) voor de
   // x-positie, bij beide handen.
-  const px = (note, i) => hasLeft ? (110 + note.start * 34) : xOf(i);
+  const px = (note, i) => hasLeft ? (STAFF_X0 + note.start * NOTE_SPACING) : xOf(i);
   const svgWidth = hasLeft
-    ? Math.max(600, 110 + lastEndBeat * 34 + 60)
-    : Math.max(600, xOf(Math.max(rightNotes.length - 1, 0)) + 60);
+    ? Math.max(S(600), STAFF_X0 + lastEndBeat * NOTE_SPACING + S(60))
+    : Math.max(S(600), xOf(Math.max(rightNotes.length - 1, 0)) + S(60));
   svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
   svgEl.style.minWidth = svgWidth + 'px';
 
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
+  [90,110,130,150,170].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));
+  const clef = el('text', { x:S(22), y:S(158), 'font-size':S(70), fill:'#2b2640' }, svgEl);
   clef.textContent = '\u{1D11E}';
 
   if (hasLeft) {
-    [250,270,290,310,330].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
-    const bassClef = el('text', { x:20, y:300, 'font-size':48, fill:'#2b2640' }, svgEl);
+    [250,270,290,310,330].forEach(y => el('line', { x1:S(20), x2:svgWidth - S(10), y1:S(y), y2:S(y), stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl));
+    const bassClef = el('text', { x:S(20), y:S(300), 'font-size':S(48), fill:'#2b2640' }, svgEl);
     bassClef.textContent = '\u{1D122}';
   }
 
   // Maatsoort: altijd een /4-maatsoort in dit datamodel (dur:1 = kwartnoot),
   // teller is het aantal tellen per maat. Op elke notenbalk van het stuk.
   function timeSignature(cx, topY, bottomY) {
-    const num = el('text', { x:cx, y:topY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    const num = el('text', { x:cx, y:topY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     num.textContent = String(beatsPerMeasure);
-    const den = el('text', { x:cx, y:bottomY, 'font-size':26, 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
+    const den = el('text', { x:cx, y:bottomY, 'font-size':S(26), 'font-weight':700, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
     den.textContent = '4';
   }
-  timeSignature(82, 118, 158);
-  if (hasLeft) timeSignature(82, 278, 318);
+  timeSignature(S(82), S(118), S(158));
+  if (hasLeft) timeSignature(S(82), S(278), S(318));
 
   let playhead = null;
   if (!previewMode) {
     // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-    playhead = el('rect', { x:0, y:staffTop - 35, width:3, height: staffBottom - staffTop + 70, rx:1.5, fill:'#e0496a', opacity:0 }, svgEl);
+    playhead = el('rect', { x:0, y:staffTop - S(35), width:S(3), height: staffBottom - staffTop + S(70), rx:S(1.5), fill:'#e0496a', opacity:0 }, svgEl);
   }
 
   // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
@@ -1018,26 +1030,26 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
   rightNotes.forEach((n, i) => {
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
     if (i > 0 && measureIdx > lastMeasure) {
-      const x = px(n, i) - 17;
-      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+      const x = px(n, i) - S(17);
+      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
     }
     lastMeasure = measureIdx;
   });
   if (rightNotes.length) {
-    const xEnd = px(lastRight, rightNotes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
+    const xEnd = px(lastRight, rightNotes.length - 1) + S(17);
+    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':S(2.5) }, svgEl);
   }
 
   function ledgerLines(x, step, yOfFn, bottomLineStep, topLineStep) {
     if (step < bottomLineStep) {
       for (let s = bottomLineStep - 2; s >= step; s -= 2) {
         const ly = yOfFn(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+        el('line', { x1:x-S(12), x2:x+S(12), y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
       }
     } else if (step > topLineStep) {
       for (let s = topLineStep + 2; s <= step; s += 2) {
         const ly = yOfFn(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
+        el('line', { x1:x-S(12), x2:x+S(12), y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':S(1.5) }, svgEl);
       }
     }
   }
@@ -1060,7 +1072,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
 
     if (n.rest) {
       const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
-      const rest = el('text', { x, y: yOfFn(bottomLineStep) - 24, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
+      const rest = el('text', { x, y: yOfFn(bottomLineStep) - S(24), 'font-size':S(32), 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
@@ -1104,7 +1116,7 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       if (needsSign) {
         const y = yOfFn(p.step);
         const signFill = p.letter === 'C' ? '#ec8f4c' : '#2b2640';
-        const sign = el('text', { x: x - 13, y: y + 5, 'font-size':17, 'text-anchor':'middle', fill: signFill, opacity: noteOpacity }, svgEl);
+        const sign = el('text', { x: x - S(13), y: y + S(5), 'font-size':S(17), 'text-anchor':'middle', fill: signFill, opacity: noteOpacity }, svgEl);
         sign.textContent = wanted === '#' ? '♯' : wanted === 'b' ? '♭' : '♮';
       }
       accState.shown[p.step] = wanted;
@@ -1124,17 +1136,17 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       const fill = isC ? '#ec8f4c' : '#2b2640';
       const clashesBelow = uniqueSteps.includes(p.step - 1);
       const clashesAbove = uniqueSteps.includes(p.step + 1);
-      const offsetX = (stemUp && clashesBelow) ? 11 : (!stemUp && clashesAbove) ? -11 : 0;
+      const offsetX = (stemUp && clashesBelow) ? S(11) : (!stemUp && clashesAbove) ? -S(11) : 0;
       el('ellipse', {
-        cx:x + offsetX, cy:y, rx:8, ry:6,
+        cx:x + offsetX, cy:y, rx:S(8), ry:S(6),
         fill: hollow ? '#fff' : fill,
         opacity: noteOpacity,
         stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
-        'stroke-width': highlight !== 'none' ? 2.5 : 1.8,
+        'stroke-width': highlight !== 'none' ? S(2.5) : S(1.8),
         'data-note-index': i, 'data-hand': handPrefix
       }, svgEl);
       if (isDotted(dur)) {
-        el('ellipse', { cx:x + offsetX + 15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
+        el('ellipse', { cx:x + offsetX + S(15), cy:y, rx:S(1.8), ry:S(1.8), fill, opacity: noteOpacity }, svgEl);
       }
     });
 
@@ -1143,22 +1155,22 @@ function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx
       // akkoord loopt (bij één toon gewoon die ene noot), in de kleur van de
       // notenbalk, ook als één van de akkoordnoten een C (oranje) is.
       const stemColor = pitches.length === 1 ? (pitches[0].letter === 'C' ? '#ec8f4c' : '#2b2640') : '#2b2640';
-      const stemX = stemUp ? x + 7 : x - 7;
+      const stemX = stemUp ? x + S(7) : x - S(7);
       const yHigh = yOfFn(maxStep), yLow = yOfFn(minStep); // hogere step = hogere toon = kleinere y
       const stemStartY = stemUp ? yLow : yHigh;
-      const stemEndY = stemUp ? yHigh - 44 : yLow + 44;
-      el('line', { x1:stemX, x2:stemX, y1:stemStartY, y2:stemEndY, stroke:stemColor, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
+      const stemEndY = stemUp ? yHigh - S(44) : yLow + S(44);
+      el('line', { x1:stemX, x2:stemX, y1:stemStartY, y2:stemEndY, stroke:stemColor, opacity: noteOpacity, 'stroke-width':S(1.6) }, svgEl);
       if (dur < 1) {
         // Vlaggetje voor een achtste noot, gespiegeld naar gelang de stokrichting.
         const d = stemUp
-          ? `M ${stemX} ${stemEndY} C ${stemX+12} ${stemEndY+4} ${stemX+9} ${stemEndY+14} ${stemX+0.5} ${stemEndY+19}`
-          : `M ${stemX} ${stemEndY} C ${stemX-12} ${stemEndY-4} ${stemX-9} ${stemEndY-14} ${stemX-0.5} ${stemEndY-19}`;
+          ? `M ${stemX} ${stemEndY} C ${stemX+S(12)} ${stemEndY+S(4)} ${stemX+S(9)} ${stemEndY+S(14)} ${stemX+S(0.5)} ${stemEndY+S(19)}`
+          : `M ${stemX} ${stemEndY} C ${stemX-S(12)} ${stemEndY-S(4)} ${stemX-S(9)} ${stemEndY-S(14)} ${stemX-S(0.5)} ${stemEndY-S(19)}`;
         el('path', { d, fill: stemColor, opacity: noteOpacity }, svgEl);
       }
     }
 
-    const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + 26 : yOfFn(minStep) + 26;
-    const finger = el('text', { x, y: fingerY, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
+    const fingerY = minStep <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + S(26) : yOfFn(minStep) + S(26);
+    const finger = el('text', { x, y: fingerY, 'font-size':S(13), 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
     finger.textContent = handPrefix + n.finger;
   }
 
@@ -1183,8 +1195,8 @@ function render() {
     : 'Klaar!';
 
   // Live-indicator: wat de microfoon nu precies hoort, getekend boven op alles.
-  liveMarker = el('circle', { cx:0, cy:0, r:6, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5, opacity:0 });
-  liveLabel = el('text', { x:0, y:0, 'font-size':12, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
+  liveMarker = el('circle', { cx:0, cy:0, r:6 * STAFF_SCALE, fill:'#2dd4bf', stroke:'#fff', 'stroke-width':1.5 * STAFF_SCALE, opacity:0 });
+  liveLabel = el('text', { x:0, y:0, 'font-size':12 * STAFF_SCALE, 'font-weight':700, 'text-anchor':'middle', fill:'#2dd4bf', opacity:0 });
 
   if (notes.length) {
     const anchorIdx = Math.min(idx, notes.length - 1);
@@ -1210,7 +1222,7 @@ function animateNoteHit(i) {
   );
 
   const cx = notehead.getAttribute('cx'), cy = notehead.getAttribute('cy');
-  const ring = el('circle', { cx, cy, r: 8, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3, opacity: 0.9 });
+  const ring = el('circle', { cx, cy, r: 8 * STAFF_SCALE, fill: 'none', stroke: '#1f8f68', 'stroke-width': 3 * STAFF_SCALE, opacity: 0.9 });
   ring.style.transformBox = 'fill-box';
   ring.style.transformOrigin = 'center';
   const anim = ring.animate(
@@ -1227,7 +1239,7 @@ function scrollStaffFollow(x, hasPrevious) {
   if (suppressAutoScroll) return; // de speler scrolt zelf, laat die plek met rust
   const wrap = document.querySelector('.staffWrap');
   if (!wrap) return;
-  const target = hasPrevious ? x - 34 - 20 : 0;
+  const target = hasPrevious ? x - NOTE_SPACING - 20 * STAFF_SCALE : 0;
   const maxScroll = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
   wrap.scrollLeft = Math.min(Math.max(0, target), maxScroll);
   lastProgrammaticScrollLeft = wrap.scrollLeft;
@@ -1878,7 +1890,7 @@ function updateLiveMarker(f1, f2, midi) {
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
-  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20;
+  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20 * STAFF_SCALE;
   const color = confident ? '#2dd4bf' : '#f5a623';
 
   liveMarker.setAttribute('cx', x);
