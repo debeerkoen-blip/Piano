@@ -6,6 +6,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 ## Huidige stand
 - `index.html` is één bestand: HTML, CSS en JavaScript, zonder build-stap.
 - Microfoon: twee onafhankelijke detectoren (autocorrelatie en YIN) die het eens moeten zijn voor een toon telt, plus een state machine (zoeken/bevestigen/vasthouden). Herkent één noot tegelijk.
+- "Speel af": een op-tijd gespeelde noot bevestigen kost altijd even (`CONFIRM_MS` plus
+  een paar meetrondes van de microfoon, in de praktijk 150-250ms). `MISS_GRACE_MS` geeft
+  `tick()`'s "gemist"-sweep die tijd, anders streepte die een op-tijd gespeelde noot al
+  weg vóórdat de herkenning 'm kon bevestigen (vooral merkbaar bij Advanced, waar het
+  tijdvenster zelf al korter is dan die bevestigingstijd). De score zelf wordt er niet
+  soepeler van: `onHeard()` rekent nog steeds met het moment waarop de toon voor het
+  eerst gehoord werd, niet met het latere bevestigde moment.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt

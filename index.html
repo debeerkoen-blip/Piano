@@ -564,6 +564,10 @@ const SONGS = [
 
 // ---------- Constanten voor timing ----------
 const COUNT_IN = 4;   // tellen voordat de balk start (in tellen)
+// Extra marge (in ms) voordat tick() een noot als gemist wegstreept, zodat de
+// herkenning (CONFIRM_MS plus meetrondes) een op-tijd gespeelde noot nog kan
+// bevestigen. Zie de toelichting bij tick().
+const MISS_GRACE_MS = 300;
 
 // ---------- Niveaus: speling in timing en toonhoogte ----------
 // window: hoe ver je naast de tel mag zitten en de noot telt nog (in tellen).
@@ -1218,8 +1222,17 @@ function tick(now) {
   } else {
     // Noten die voorbij het venster zijn, tellen als gemist. Rusten vragen geen
     // input en worden gewoon overgeslagen zodra idx ze bereikt, zonder straf.
+    //
+    // MISS_GRACE geeft de herkenning de tijd om een op tijd gespeelde noot nog te
+    // bevestigen voordat deze lus 'm als gemist wegstreept. Een toon bevestigen
+    // kost altijd even (CONFIRM_MS plus tot twee meetrondes van de microfoon, in
+    // de praktijk zo'n 150-250ms, gemeten met echte opnames), en zonder marge
+    // schreef deze lus zelfs op-tijd gespeelde noten al af vóórdat onHeard() de
+    // kans kreeg ze goed te keuren. De score zelf wordt er niet soepeler van:
+    // onHeard() rekent met het moment waarop de toon voor het eerst gehoord werd
+    // (noteCandidateSince), niet met het latere bevestigde moment.
     let missed = false;
-    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + difficulty.window)) {
+    while (idx < notes.length && (notes[idx].rest || t > notes[idx].start + difficulty.window + MISS_GRACE_MS / beatMs)) {
       if (notes[idx].rest) {
         idx++;
         continue;
