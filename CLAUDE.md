@@ -18,6 +18,12 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   eerst gehoord werd, niet met het latere bevestigde moment.
 - Live-indicator op de notenbalk: toont wat de microfoon echt hoort (teal = betrouwbaar, amber = onzeker), ook tijdens "Stem af op C". Bedoeld om de herkenning te debuggen.
 - Notenbalk: SVG. C-noten zijn oranje. Vingerzetting onder elke noot als R1 t/m R5 (rechterhand). Maatstrepen en kwartrusten (`null` in `notes`) worden getekend.
+  De hele notatie (lijnafstand, notenkoppen, lettergroottes, afstand tussen noten) loopt via
+  `STAFF_SCALE` (1,3) in `drawGrandStaff`, via de helper `S(v) = v * STAFF_SCALE`. Er zat te
+  veel witruimte in de kaart t.o.v. hoe klein de notatie oogde; dit vergroot alles in verhouding
+  (viewBox-breedte/hoogte schalen mee, dus geen scheve aspect ratio). `STAFF_X0`/`NOTE_SPACING`
+  zijn de geschaalde basismaten die ook buiten `drawGrandStaff` gebruikt worden (`xOf`, `noteX`,
+  `xAtTime`, `timeAtX`, `scrollStaffFollow`); die rekenen niet meer met de losse getallen 110/34.
 - Notatieregels die de app volgt: maatsoort (teller/4) boven elke notenbalk, stokrichting wisselt
   bij de middenlijn (erop of erboven: stok omlaag; eronder: stok omhoog), hele noten zonder stok,
   en een kruis/mol/herstelteken wordt maar één keer per maat per toonhoogte getoond (niet bij elke
