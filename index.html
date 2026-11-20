@@ -68,6 +68,7 @@
   .ok { color:var(--ok-text); } .bad { color:var(--bad-text); }
 
   .legend { font-size:13px; color:var(--muted); margin-top:var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-1) var(--space-4); align-items:center; }
+  .legend[hidden] { display:none; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   /* ---------- Besturing, gegroepeerd per functie ---------- */
   .controlGroups { display:flex; flex-wrap:wrap; gap:var(--space-6); margin-top:var(--space-6); }
@@ -109,7 +110,16 @@
 
   /* ---------- Lied toevoegen vanaf foto/pdf ---------- */
   .addCard { margin-top:var(--space-6); }
-  .fileLabel { display:block; font-size:13px; color:var(--muted); margin-top:var(--space-4); }
+  .addCard .groupLabel { display:block; margin-top:var(--space-4); margin-bottom:var(--space-1); }
+  /* Foto/pdf en het voorbeeldbalkje naast elkaar, zodat ze makkelijk te vergelijken
+     zijn; op smalle schermen staan ze gewoon onder elkaar. */
+  .addLayout { display:grid; grid-template-columns: 1fr; gap: var(--space-4); margin-top: var(--space-4); align-items:start; }
+  @media (min-width: 760px) {
+    .addLayout { grid-template-columns: 1fr 1fr; }
+  }
+  .addRef, .addStaffWrap { min-width:0; }
+  .addStaffWrap .previewStaff { margin-top:var(--space-2); }
+  .fileLabel { display:block; font-size:13px; color:var(--muted); }
   .fileLabel input { display:block; margin-top:var(--space-2); }
   .refPreview { margin-top:var(--space-3); }
   .refPreview img { max-width:100%; max-height:420px; border-radius:var(--radius-m); border:1px solid var(--border); display:block; }
@@ -178,6 +188,10 @@
       <i style="background:#2dd4bf"></i>microfoon hoort dit zeker &nbsp;
       <i style="background:#f5a623"></i>microfoon hoort iets, onzeker
     </div>
+    <div class="legend" id="handLegend" hidden>
+      De onderste notenbalk (links, L1 t/m L5) is de linkerhand: die staat er alleen bij
+      als voorbeeld en wordt nog niet door de microfoon beoordeeld.
+    </div>
 
     <div class="controlGroups">
       <div class="controlGroup">
@@ -233,10 +247,18 @@
     <div id="addPanel" hidden>
       <p class="sub">Zet een foto of pdf van de bladmuziek erbij, en typ de noten, de duur en de vingerzetting over. Het lied komt dan in je lijst te staan om te oefenen. De foto of pdf zelf wordt niet bewaard.</p>
 
-      <label class="fileLabel">Foto of pdf van de bladmuziek
-        <input type="file" id="refFile" accept="image/*,application/pdf">
-      </label>
-      <div id="refPreview" class="refPreview"></div>
+      <div class="addLayout">
+        <div class="addRef">
+          <label class="fileLabel">Foto of pdf van de bladmuziek
+            <input type="file" id="refFile" accept="image/*,application/pdf">
+          </label>
+          <div id="refPreview" class="refPreview"></div>
+        </div>
+        <div class="addStaffWrap">
+          <span class="groupLabel">Voorbeeld (vergelijk met de foto hiernaast)</span>
+          <svg id="previewStaff" viewBox="0 0 600 240" class="previewStaff"></svg>
+        </div>
+      </div>
 
       <div class="formRow">
         <label>Titel <input type="text" id="newTitle" placeholder="Titel van het lied"></label>
@@ -244,13 +266,19 @@
         <label>Tellen per maat <input type="number" id="newBeats" value="4" min="1" max="12"></label>
       </div>
 
+      <span class="groupLabel">Rechterhand</span>
       <div id="noteRows" class="noteRows"></div>
       <div class="rowButtons">
         <button id="addNoteBtn" class="btn-ghost" type="button">+ Noot</button>
         <button id="addRestBtn" class="btn-ghost" type="button">+ Rust</button>
       </div>
 
-      <svg id="previewStaff" viewBox="0 0 600 240" class="previewStaff"></svg>
+      <span class="groupLabel">Linkerhand (optioneel)</span>
+      <div id="noteRowsLeft" class="noteRows"></div>
+      <div class="rowButtons">
+        <button id="addNoteBtnLeft" class="btn-ghost" type="button">+ Noot</button>
+        <button id="addRestBtnLeft" class="btn-ghost" type="button">+ Rust</button>
+      </div>
 
       <div class="groupRow">
         <button id="saveSongBtn" type="button">Lied opslaan</button>
@@ -320,7 +348,33 @@ const SONGS = [
       1,1,1,1, 4,4,4, 4,4,4, 4,
       4,4,4, 5,5,5, 4,4,4, 5,5,5,
       4,4,4,4, 4,4,4, 4,4,4, 4
-    ]
+    ],
+    // Linkerhand (baspartij), ook overgetypt van de foto met pixelmetingen.
+    // De laatste twee tellen (einde van maat 15 en heel maat 16) waren in de
+    // bron een akkoord van twee noten; de app kent nog geen akkoorden, dus die
+    // zijn teruggebracht tot één noot (de onderste/belangrijkste), op het gehoor
+    // gecontroleerd als een V-I slotcadens (C naar F). Extra reden om dit tegen
+    // de partituur te controleren.
+    left: {
+      notes: [
+        'E3','D3','E3', 'F3', 'E3', 'E3',
+        'E3','D3','E3', 'F3', 'E3','D3','C3', 'F3',
+        'E3','E3', 'F3', 'E3','D3','C3', 'F3',
+        'E3','D3','E3', 'F3', 'E3','C3', 'F3'
+      ],
+      durations: [
+        1,1,1, 3, 3, 3,
+        1,1,1, 3, 1.5,0.5,1, 3,
+        2,1, 3, 1.5,0.5,1, 3,
+        1,1,1, 3, 2,1, 3
+      ],
+      fingers: [
+        3,3,3, 3, 3, 3,
+        3,3,3, 3, 3,3,3, 3,
+        3,3, 3, 3,3,3, 3,
+        3,3,3, 3, 3,1, 1
+      ]
+    }
   }
 ];
 
@@ -366,12 +420,20 @@ function el(tag, attrs, parent = staff) {
   return e;
 }
 const yOf = step => 170 - (step - 30) * 10; // E4 zit op de onderste lijn
+const yOfBass = step => 330 - (step - 18) * 10; // G2 zit op de onderste lijn
 const xOf = i => 110 + i * 34;
 
-// X-positie van de speelstreep op tijdstip t (in tellen): de noten staan steeds
-// even ver uit elkaar op de balk, maar duren niet allemaal even lang, dus de
-// streep interpoleert tussen de huidige en de volgende noot naar rato van de tel.
+// X-positie van een noot. Bij een lied zonder linkerhand staan de noten gewoon
+// even ver uit elkaar op volgorde (xOf). Heeft een lied wel een linkerhand, dan
+// moeten beide handen op dezelfde tel verticaal uitgelijnd staan, dus dan telt
+// de echte teltijd (note.start) in plaats van de positie in de rij.
+function noteX(note, i) {
+  return song.left ? (110 + note.start * 34) : xOf(i);
+}
+
+// X-positie van de speelstreep op tijdstip t (in tellen).
 function xAtTime(t) {
+  if (song.left) return 110 + Math.max(0, t) * 34;
   if (!notes.length) return xOf(0);
   let i = 0;
   while (i + 1 < notes.length && notes[i + 1].start <= t) i++;
@@ -384,25 +446,33 @@ function xAtTime(t) {
 // ---------- Spelstatus ----------
 let song = SONGS[0];
 let notes = [];
+let contextNotes = []; // de andere hand, alleen ter context getoond, niet beoordeeld
 let idx = 0, xp = 0, streak = 0, totalStars = 0, wrongs = 0;
 let playing = false, startT = 0, beatMs = 667, rafId = null;
 let phRect = null, liveMarker = null, liveLabel = null;
+
+// Zet de notenamen/duren/vingerzetting van één hand om in de interne vorm met
+// cumulatieve teltijd (start), gedeeld door loadSong voor rechter- en linkerhand.
+function parseHand(hand) {
+  const durations = hand.durations || hand.notes.map(() => 1);
+  let cum = 0;
+  return hand.notes.map((n, i) => {
+    const dur = durations[i];
+    const note = n === null
+      ? { rest: true, start: cum, dur, label: 'rust', finger: null }
+      : { ...parseNote(n), rest: false, finger: hand.fingers[i], start: cum, dur };
+    cum += dur;
+    return note;
+  });
+}
 
 function loadSong(s) {
   stopPlay(false);
   resetNoteDetection();
   song = s;
   beatMs = 60000 / s.bpm;
-  const durations = s.durations || s.notes.map(() => 1);
-  let cum = 0;
-  notes = s.notes.map((n, i) => {
-    const dur = durations[i];
-    const note = n === null
-      ? { rest: true, start: cum, dur, label: 'rust', finger: null }
-      : { ...parseNote(n), rest: false, finger: s.fingers[i], start: cum, dur };
-    cum += dur;
-    return note;
-  });
+  notes = parseHand(s);
+  contextNotes = s.left ? parseHand(s.left) : [];
   idx = 0; wrongs = 0; streak = 0;
   skipRests();
   document.getElementById('title').textContent = s.title;
@@ -410,6 +480,7 @@ function loadSong(s) {
   warn.hidden = !s.draft;
   warn.textContent = 'Let op: deze noten, vingerzetting en maatindeling zijn nog niet tegen de partituur gecontroleerd. Vergelijk ze met de bron voordat je er serieus mee oefent.';
   document.getElementById('restart').disabled = true;
+  document.getElementById('handLegend').hidden = !s.left;
   setFeedback('Speel de eerste noot, of druk op Speel af.', '');
   render();
   updateStats();
@@ -434,97 +505,150 @@ function updateStats() {
   document.getElementById('bar').style.width = pct + '%';
 }
 
-function render() {
-  staff.innerHTML = '';
-  // Bij langere liedjes passen niet alle noten op een balk van 600 breed: de
-  // viewBox (en de minimumbreedte) wordt dan groter, zodat de noten leesbaar
-  // blijven. De staffWrap eromheen zorgt dan voor horizontaal scrollen.
-  const svgWidth = Math.max(600, xOf(Math.max(notes.length - 1, 0)) + 60);
-  staff.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
-  staff.style.minWidth = svgWidth + 'px';
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' });
+// Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
+const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
+
+// Tekent een notenbalk (of grote notenbalk met baspartij erbij) in svgEl.
+// Gedeeld door de echte oefenbalk en het voorbeeldbalkje in "Lied toevoegen".
+// activeIdx: index van de noot die nu gespeeld/beoordeeld wordt in rightNotes,
+// of null voor een pure voorbeeldweergave (beide handen gewoon goed zichtbaar,
+// niets gemarkeerd of gedimd).
+function drawGrandStaff(svgEl, rightNotes, leftNotes, beatsPerMeasure, activeIdx) {
+  svgEl.innerHTML = '';
+  const previewMode = activeIdx === null;
+  const hasLeft = leftNotes && leftNotes.length > 0;
+  const svgHeight = hasLeft ? 420 : 240;
+  const staffTop = 90, staffBottom = hasLeft ? 330 : 170;
+
+  const lastRight = rightNotes.length ? rightNotes[rightNotes.length - 1] : null;
+  const lastLeft = hasLeft ? leftNotes[leftNotes.length - 1] : null;
+  const lastEndBeat = Math.max(
+    lastRight ? lastRight.start + lastRight.dur : 0,
+    lastLeft ? lastLeft.start + lastLeft.dur : 0
+  );
+  // Zonder linkerhand staan de noten gewoon op volgorde even ver uit elkaar
+  // (xOf). Mét linkerhand moeten beide handen op dezelfde tel verticaal
+  // uitgelijnd staan, dus dan telt de echte teltijd (note.start) voor de
+  // x-positie, bij beide handen.
+  const px = (note, i) => hasLeft ? (110 + note.start * 34) : xOf(i);
+  const svgWidth = hasLeft
+    ? Math.max(600, 110 + lastEndBeat * 34 + 60)
+    : Math.max(600, xOf(Math.max(rightNotes.length - 1, 0)) + 60);
+  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+  svgEl.style.minWidth = svgWidth + 'px';
+
+  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
+  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
   clef.textContent = '\u{1D11E}';
 
-  // Speelstreep eerst tekenen, zodat de noten erboven liggen.
-  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#e0496a', opacity:0 });
+  if (hasLeft) {
+    [250,270,290,310,330].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
+    const bassClef = el('text', { x:20, y:300, 'font-size':48, fill:'#2b2640' }, svgEl);
+    bassClef.textContent = '\u{1D122}';
+  }
+
+  let playhead = null;
+  if (!previewMode) {
+    // Speelstreep eerst tekenen, zodat de noten erboven liggen.
+    playhead = el('rect', { x:0, y:staffTop - 35, width:3, height: staffBottom - staffTop + 70, rx:1.5, fill:'#e0496a', opacity:0 }, svgEl);
+  }
 
   // Maatstrepen: op basis van de werkelijke teltijd van elke noot (cumulatief),
-  // zodat het ook klopt bij noten die niet allemaal even lang duren.
-  const beatsPerMeasure = song.beatsPerMeasure || 4;
+  // zodat het ook klopt bij noten die niet allemaal even lang duren. Bij twee
+  // handen lopen de maatstrepen door beide notenbalken heen.
   let lastMeasure = 0;
-  notes.forEach((n, i) => {
+  rightNotes.forEach((n, i) => {
     const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
     if (i > 0 && measureIdx > lastMeasure) {
-      const x = xOf(i) - 17;
-      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 });
+      const x = px(n, i) - 17;
+      el('line', { x1:x, x2:x, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
     }
     lastMeasure = measureIdx;
   });
-  if (notes.length) {
-    const xEnd = xOf(notes.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 });
+  if (rightNotes.length) {
+    const xEnd = px(lastRight, rightNotes.length - 1) + 17;
+    el('line', { x1:xEnd, x2:xEnd, y1:staffTop, y2:staffBottom, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
   }
 
-  // Een notenwaarde is "gestippeld" als hij geen macht van twee is (1.5, 3, ...).
-  const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
-
-  function ledgerLines(x, step) {
-    if (step < 30) {
-      for (let s = 28; s >= step; s -= 2) {
-        const ly = yOf(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 });
+  function ledgerLines(x, step, yOfFn, bottomLineStep, topLineStep) {
+    if (step < bottomLineStep) {
+      for (let s = bottomLineStep - 2; s >= step; s -= 2) {
+        const ly = yOfFn(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
       }
-    } else if (step > 38) {
-      for (let s = 40; s <= step; s += 2) {
-        const ly = yOf(s);
-        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 });
+    } else if (step > topLineStep) {
+      for (let s = topLineStep + 2; s <= step; s += 2) {
+        const ly = yOfFn(s);
+        el('line', { x1:x-12, x2:x+12, y1:ly, y2:ly, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
       }
     }
   }
 
-  notes.forEach((n, i) => {
-    const x = xOf(i);
-    const done = i < idx;
-    const opacity = done ? 1 : 0.45;
+  // isActiveHand: de hand die beoordeeld wordt (huidige noot gemarkeerd,
+  // gespeelde noten groen) tijdens het oefenen; bij een voorbeeldbalkje (geen
+  // activeIdx) staan beide handen gewoon duidelijk leesbaar.
+  function drawNote(n, i, { yOfFn, bottomLineStep, topLineStep, isActiveHand, handPrefix }) {
+    const x = px(n, i);
 
     if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity });
+      const opacity = previewMode ? 1 : (isActiveHand && i < activeIdx ? 1 : 0.45);
+      const rest = el('text', { x, y: yOfFn(bottomLineStep) - 24, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640', opacity }, svgEl);
       rest.textContent = '\u{1D13D}'; // kwart rust
       return;
     }
 
-    const y = yOf(n.step);
+    const y = yOfFn(n.step);
     const isC = n.letter === 'C';
     const fill = isC ? '#ec8f4c' : '#2b2640';
-    const current = i === idx;
-    const noteOpacity = (done || current) ? 1 : 0.45;
-    const highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
     const dur = n.dur || 1;
     const hollow = dur >= 2;
+    let noteOpacity = 1, highlight = 'none';
+    if (!previewMode) {
+      if (isActiveHand) {
+        const done = i < activeIdx;
+        const current = i === activeIdx;
+        noteOpacity = (done || current) ? 1 : 0.45;
+        highlight = done ? '#1f8f68' : current ? '#8c73e8' : 'none';
+      } else {
+        noteOpacity = 0.4;
+      }
+    }
 
-    ledgerLines(x, n.step);
+    ledgerLines(x, n.step, yOfFn, bottomLineStep, topLineStep);
     el('ellipse', {
       cx:x, cy:y, rx:8, ry:6,
       fill: hollow ? '#fff' : fill,
       opacity: noteOpacity,
       stroke: highlight !== 'none' ? highlight : (hollow ? fill : 'none'),
       'stroke-width': highlight !== 'none' ? 2.5 : 1.8
-    });
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 });
+    }, svgEl);
+    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, opacity: noteOpacity, 'stroke-width':1.6 }, svgEl);
     if (dur < 1) {
       // Vlaggetje voor een achtste noot.
-      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity });
+      el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill, opacity: noteOpacity }, svgEl);
     }
     if (isDotted(dur)) {
-      el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity });
+      el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill, opacity: noteOpacity }, svgEl);
     }
 
-    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity });
-    finger.textContent = 'R' + n.finger;
-  });
+    const fingerY = n.step <= bottomLineStep - 2 ? yOfFn(bottomLineStep - 2) + 26 : y + 26;
+    const finger = el('text', { x, y: fingerY, 'font-size':13, 'text-anchor':'middle', fill:'#555', opacity: noteOpacity }, svgEl);
+    finger.textContent = handPrefix + n.finger;
+  }
 
-  const label = el('text', { x:300, y:236, 'font-size':16, 'text-anchor':'middle', fill:'#555' });
+  rightNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOf, bottomLineStep: 30, topLineStep: 38, isActiveHand: true, handPrefix: 'R' }));
+  if (hasLeft) {
+    leftNotes.forEach((n, i) => drawNote(n, i, { yOfFn: yOfBass, bottomLineStep: 18, topLineStep: 26, isActiveHand: false, handPrefix: 'L' }));
+  }
+
+  return { svgWidth, svgHeight, staffTop, staffBottom, playhead };
+}
+
+function render() {
+  const { svgWidth, svgHeight, playhead } = drawGrandStaff(staff, notes, contextNotes, song.beatsPerMeasure || 4, idx);
+  phRect = playhead;
+
+  const label = el('text', { x: svgWidth / 2, y: svgHeight - 4, 'font-size':16, 'text-anchor':'middle', fill:'#555' });
   label.textContent = idx < notes.length
     ? `Speel: ${notes[idx].label} met R${notes[idx].finger}`
     : 'Klaar!';
@@ -721,7 +845,10 @@ function startPlay() {
   if (document.getElementById('soundToggle').checked && audioCtx) {
     const beatSec = beatMs / 1000;
     const audioStart = audioCtx.currentTime;
-    notes.forEach(n => {
+    // Beide handen klinken mee bij het afspelen, ook al wordt alleen de
+    // rechterhand beoordeeld: dat klinkt muzikaler en helpt om de samenhang
+    // tussen de handen te horen.
+    [...notes, ...contextNotes].forEach(n => {
       if (n.rest) return;
       scheduleNoteSound(n.midi, audioStart + (COUNT_IN + n.start) * beatSec, n.dur * beatSec * 0.85);
     });
@@ -946,7 +1073,7 @@ function updateLiveMarker(f1, f2, midi) {
   const step = parseNote(noteLabel).step;
   const y = yOf(step);
   const atIdx = idx < notes.length ? idx : Math.max(notes.length - 1, 0);
-  const x = xOf(atIdx) + 20;
+  const x = (notes.length ? noteX(notes[atIdx], atIdx) : xOf(0)) + 20;
   const color = confident ? '#2dd4bf' : '#f5a623';
 
   liveMarker.setAttribute('cx', x);
@@ -1149,7 +1276,7 @@ function selectEl(className, options, selected, labelFn) {
   return sel;
 }
 
-function createNoteRow(opts = {}) {
+function createNoteRow(opts = {}, handPrefix = 'R') {
   const row = document.createElement('div');
   row.className = 'noteRow';
 
@@ -1171,14 +1298,14 @@ function createNoteRow(opts = {}) {
   const accSel = selectEl('accSel', ACCIDENTALS, opts.accidental || '');
   const octSel = selectEl('octSel', [3,4,5,6], opts.octave || 4);
   const durSel = selectEl('durSel', DURATIONS, opts.dur || 1);
-  const fingerSel = selectEl('fingerSel', [1,2,3,4,5].map(f => [f, 'R' + f]), opts.finger || 1);
+  const fingerSel = selectEl('fingerSel', [1,2,3,4,5].map(f => [f, handPrefix + f]), opts.finger || 1);
   [letterSel, accSel, octSel, durSel, fingerSel].forEach(s => row.appendChild(s));
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'removeRow';
   removeBtn.textContent = '✕';
-  removeBtn.addEventListener('click', () => { row.remove(); renumberRows(); renderPreview(); });
+  removeBtn.addEventListener('click', () => { row.remove(); renumberRows(row.parentElement.id); renderPreview(); });
   row.appendChild(removeBtn);
 
   function applyRestState() {
@@ -1196,26 +1323,30 @@ function createNoteRow(opts = {}) {
   return row;
 }
 
-function renumberRows() {
-  document.querySelectorAll('#noteRows .noteRow').forEach((row, i) => {
+function renumberRows(containerId) {
+  document.querySelectorAll(`#${containerId} .noteRow`).forEach((row, i) => {
     row.querySelector('.rowNum').textContent = (i + 1) + '.';
   });
 }
 
-document.getElementById('addNoteBtn').addEventListener('click', () => {
-  document.getElementById('noteRows').appendChild(createNoteRow({}));
-  renumberRows();
-  renderPreview();
-});
-document.getElementById('addRestBtn').addEventListener('click', () => {
-  document.getElementById('noteRows').appendChild(createNoteRow({ rest: true }));
-  renumberRows();
-  renderPreview();
-});
+function wireRowButtons(containerId, addBtnId, restBtnId, handPrefix) {
+  document.getElementById(addBtnId).addEventListener('click', () => {
+    document.getElementById(containerId).appendChild(createNoteRow({}, handPrefix));
+    renumberRows(containerId);
+    renderPreview();
+  });
+  document.getElementById(restBtnId).addEventListener('click', () => {
+    document.getElementById(containerId).appendChild(createNoteRow({ rest: true }, handPrefix));
+    renumberRows(containerId);
+    renderPreview();
+  });
+}
+wireRowButtons('noteRows', 'addNoteBtn', 'addRestBtn', 'R');
+wireRowButtons('noteRowsLeft', 'addNoteBtnLeft', 'addRestBtnLeft', 'L');
 document.getElementById('newBeats').addEventListener('change', renderPreview);
 
-function readNoteRows() {
-  const rows = [...document.querySelectorAll('#noteRows .noteRow')];
+function readNoteRows(containerId) {
+  const rows = [...document.querySelectorAll(`#${containerId} .noteRow`)];
   const notesOut = [], durationsOut = [], fingersOut = [];
   rows.forEach(row => {
     const dur = parseFloat(row.querySelector('.durSel').value);
@@ -1234,70 +1365,27 @@ function readNoteRows() {
   return { notes: notesOut, durations: durationsOut, fingers: fingersOut };
 }
 
-// Zelfstandige tekenfunctie voor het voorbeeld-notenbalkje: gebruikt dezelfde
-// el()/parseNote()/xOf()/yOf() hulpjes als de echte notenbalk, maar zonder
-// voortgangsstatus (geen "gespeeld"/"huidig").
+// Hergebruikt dezelfde drawGrandStaff() als de echte oefenbalk, zodat het
+// voorbeeldbalkje er precies zo uitziet als wat je straks gaat oefenen.
 function renderPreview() {
   const svgEl = document.getElementById('previewStaff');
-  svgEl.innerHTML = '';
-  const { notes: noteNames, durations, fingers } = readNoteRows();
-  if (!noteNames.length) return;
-
-  const svgWidth = Math.max(600, xOf(noteNames.length - 1) + 60);
-  svgEl.setAttribute('viewBox', `0 0 ${svgWidth} 240`);
-  [90,110,130,150,170].forEach(y => el('line', { x1:20, x2:svgWidth - 10, y1:y, y2:y, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl));
-  const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#2b2640' }, svgEl);
-  clef.textContent = '\u{1D11E}';
+  const right = readNoteRows('noteRows');
+  const left = readNoteRows('noteRowsLeft');
+  if (!right.notes.length && !left.notes.length) { svgEl.innerHTML = ''; return; }
 
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
-  let cum = 0, lastMeasure = 0;
-  const parsed = noteNames.map((n, i) => {
-    const dur = durations[i];
-    const note = n === null
-      ? { rest:true, start:cum, dur }
-      : { ...parseNote(n), rest:false, finger:fingers[i], start:cum, dur };
-    cum += dur;
-    return note;
-  });
-
-  parsed.forEach((n, i) => {
-    const measureIdx = Math.floor((n.start + 0.001) / beatsPerMeasure);
-    if (i > 0 && measureIdx > lastMeasure) {
-      const x = xOf(i) - 17;
-      el('line', { x1:x, x2:x, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
-    }
-    lastMeasure = measureIdx;
-  });
-  if (parsed.length) {
-    const xEnd = xOf(parsed.length - 1) + 17;
-    el('line', { x1:xEnd, x2:xEnd, y1:90, y2:170, stroke:'#2b2640', 'stroke-width':2.5 }, svgEl);
-  }
-
-  const isDotted = dur => Math.abs(Math.log2(dur) - Math.round(Math.log2(dur))) > 0.01;
-
-  parsed.forEach((n, i) => {
-    const x = xOf(i);
-    if (n.rest) {
-      const rest = el('text', { x, y:146, 'font-size':32, 'text-anchor':'middle', fill:'#2b2640' }, svgEl);
-      rest.textContent = '\u{1D13D}';
-      return;
-    }
-    const y = yOf(n.step);
-    const isC = n.letter === 'C';
-    const fill = isC ? '#ec8f4c' : '#2b2640';
-    const hollow = n.dur >= 2;
-    if (n.step < 30) {
-      for (let s = 28; s >= n.step; s -= 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
-    } else if (n.step > 38) {
-      for (let s = 40; s <= n.step; s += 2) el('line', { x1:x-12, x2:x+12, y1:yOf(s), y2:yOf(s), stroke:'#2b2640', 'stroke-width':1.5 }, svgEl);
-    }
-    el('ellipse', { cx:x, cy:y, rx:8, ry:6, fill: hollow ? '#fff' : fill, stroke: hollow ? fill : 'none', 'stroke-width':1.8 }, svgEl);
-    el('line', { x1:x+7, x2:x+7, y1:y, y2:y-44, stroke:fill, 'stroke-width':1.6 }, svgEl);
-    if (n.dur < 1) el('path', { d:`M ${x+7} ${y-44} C ${x+19} ${y-40} ${x+16} ${y-30} ${x+7.5} ${y-25}`, fill }, svgEl);
-    if (isDotted(n.dur)) el('ellipse', { cx:x+15, cy:y, rx:1.8, ry:1.8, fill }, svgEl);
-    const finger = el('text', { x, y: n.step <= 28 ? 216 : y + 26, 'font-size':13, 'text-anchor':'middle', fill:'#555' }, svgEl);
-    finger.textContent = 'R' + n.finger;
-  });
+  const parseRows = hand => {
+    let cum = 0;
+    return hand.notes.map((n, i) => {
+      const dur = hand.durations[i];
+      const note = n === null
+        ? { rest:true, start:cum, dur, finger:null }
+        : { ...parseNote(n), rest:false, finger:hand.fingers[i], start:cum, dur };
+      cum += dur;
+      return note;
+    });
+  };
+  drawGrandStaff(svgEl, parseRows(right), parseRows(left), beatsPerMeasure, null);
 }
 
 document.getElementById('saveSongBtn').addEventListener('click', () => {
@@ -1305,11 +1393,12 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   const title = document.getElementById('newTitle').value.trim();
   const bpm = parseFloat(document.getElementById('newBpm').value) || 100;
   const beatsPerMeasure = parseFloat(document.getElementById('newBeats').value) || 4;
-  const { notes: noteNames, durations, fingers } = readNoteRows();
+  const right = readNoteRows('noteRows');
+  const left = readNoteRows('noteRowsLeft');
 
   if (!title) { fb.textContent = 'Geef het lied een titel.'; fb.className = 'pill bad'; return; }
-  if (!noteNames.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe.'; fb.className = 'pill bad'; return; }
-  for (const n of noteNames) {
+  if (!right.notes.length) { fb.textContent = 'Voeg eerst minstens één noot of rust toe bij de rechterhand.'; fb.className = 'pill bad'; return; }
+  for (const n of [...right.notes, ...left.notes]) {
     if (n !== null && !/^[A-G](#|b)?[3-6]$/.test(n)) {
       fb.textContent = `Ongeldige noot: ${n}`; fb.className = 'pill bad'; return;
     }
@@ -1319,8 +1408,11 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
     id: 'custom-' + Date.now(),
     title, bpm, beatsPerMeasure,
     draft: true, custom: true,
-    notes: noteNames, durations, fingers
+    notes: right.notes, durations: right.durations, fingers: right.fingers
   };
+  if (left.notes.length) {
+    newSong.left = { notes: left.notes, durations: left.durations, fingers: left.fingers };
+  }
   customSongs.push(newSong);
   saveCustomSongs(customSongs);
   populateSongSelect();
@@ -1331,8 +1423,8 @@ document.getElementById('saveSongBtn').addEventListener('click', () => {
   fb.className = 'pill ok';
 });
 
-document.getElementById('noteRows').appendChild(createNoteRow({}));
-renumberRows();
+document.getElementById('noteRows').appendChild(createNoteRow({}, 'R'));
+renumberRows('noteRows');
 renderPreview();
 renderCustomList();
 
