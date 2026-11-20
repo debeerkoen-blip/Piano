@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Best effort tegen een hardnekkig cacheprobleem (vooral mobiele Safari): deze
+     meta-tags worden door browsers voor de echte HTTP-cache meestal genegeerd
+     (die luistert naar de Cache-Control header die GitHub Pages zelf verstuurt,
+     niet aan te passen zonder server), maar kunnen in-memory/bfcache-hergebruik
+     bij terugnavigeren wel helpen voorkomen. Zie CLAUDE.md "Let op": na elke
+     update kan een gewone herlaad alsnog een oude cache tonen, dan helpt alleen
+     een echte harde herlaad of een privénavigatievenster. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Piano prototype</title>
 <style>
   :root {
