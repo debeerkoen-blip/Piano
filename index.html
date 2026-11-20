@@ -167,8 +167,8 @@ function render() {
   const clef = el('text', { x:22, y:158, 'font-size':70, fill:'#333' });
   clef.textContent = '\u{1D11E}';
 
-  // Speelbalk eerst tekenen, zodat de noten erboven liggen.
-  phRect = el('rect', { x:0, y:58, width:34, height:136, fill:'#3b6fd4', opacity:0 });
+  // Speelstreep eerst tekenen, zodat de noten erboven liggen.
+  phRect = el('rect', { x:0, y:55, width:3, height:145, rx:1.5, fill:'#dc2626', opacity:0 });
 
   notes.forEach((n, i) => {
     const x = xOf(i);
@@ -299,9 +299,9 @@ function tick(now) {
       stopPlay(true);
       return;
     }
-    const x = xOf(0) + t * 34 - 17;
+    const x = xOf(0) + t * 34 - 1.5;
     phRect.setAttribute('x', x);
-    phRect.setAttribute('opacity', 0.18);
+    phRect.setAttribute('opacity', 1);
   }
   rafId = requestAnimationFrame(tick);
 }
