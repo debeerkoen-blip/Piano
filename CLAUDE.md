@@ -239,6 +239,30 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   zonder build-stap, en de uitkomst op een foto is sowieso niet gegarandeerd correct. In plaats
   daarvan: geef de foto aan Claude in de chat, die leest 'm nauwkeurig af (zo nodig met
   pixelmetingen op de bladmuziek) en vult het lied in.
+- Dev-testmodus om de herkenning af te stellen tegen een opbouwende "testdatabase" van echte
+  opnames, i.p.v. alleen digitaal gesimuleerde degradatie. Alleen zichtbaar met `?dev=1` in de
+  URL (anders blijft `#devTestGroup` verborgen, gewone gebruikers zien er niets van), onderaan
+  het instellingenpaneel.
+  Werkt door een opgenomen audiobestand af te spelen door **dezelfde** analysers
+  (`wireAnalysersTo()`, een nieuwe gedeelde helper die zowel `startMic()` als
+  `startTestAudioMic()` gebruiken) als een echte microfoon zou gebruiken: geen aparte
+  testversie van de herkenning die uit de pas kan gaan lopen met de echte. Kies een
+  audiobestand, dan start `startTestAudioMic()` de afspeler en wordt `micOn` gezet alsof de
+  microfoon aanstaat; klik daarna gewoon op "Speel af" (met "Met geluid" uit, anders klinkt de
+  synthetische pianoklank boven op de opname) om de opname mee te laten scoren via de
+  bestaande `idx`/`noteResults`-machinerie, exact zoals bij een live microfoon.
+  Voor een zinnige meting moet de opname op hetzelfde moment beginnen als het klikken op
+  "Speel af" (dezelfde 4-tel count-in als een live sessie zou geven): een opname van een
+  eerdere sessie waarin je al mét "Speel af" meespeelde voldoet daaraan vanzelf.
+  `onHeard()` logt tijdens deze modus (`testAudioMode`) elke beoordeling in
+  `testDiagnosticsLog`, ook de foute pogingen (met wat er precies gehoord werd, niet alleen
+  "gemist"): rijker dan `noteResults` alleen, bedoeld om te zien waar drempelwaarden als
+  `CHORD_PEAK_MIN_DB`/`RMS_THRESHOLD` moeten worden bijgesteld. "Resultaat exporteren (JSON)"
+  (`exportTestResult()`) downloadt dat samen met `noteResults` en het lied/niveau als één
+  bestand; bewaar die bestanden ergens (buiten de repo, of in een eigen map) als de
+  groeiende testdatabase.
+  De microfoon (en dus ook deze testmodus) kan maar één keer per paginasessie aan, net als bij
+  een echte microfoon: voor een volgend testbestand moet de pagina opnieuw geladen worden.
 
 ## Let op
 - Na elke update kan het zijn dat je op je telefoon (vooral mobiele Safari) nog een oude,
@@ -262,7 +286,13 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
   voor akkoordherkenning bij de rechterhand (`detectChordMatch`): die is alleen digitaal getest
   (geschakeld geluid rechtstreeks afgetapt naar een analyser, zie de uitleg bij "Huidige stand"),
   nog niet met een echte microfoon en akoestische piano. De drempelwaarden (`CHORD_PEAK_MIN_DB`
-  e.a.) zijn daarop gebaseerd en kunnen bijstelling nodig hebben zodra dat wel gebeurt.
+  e.a.) zijn daarop gebaseerd en kunnen bijstelling nodig hebben zodra dat wel gebeurt. De
+  dev-testmodus (`?dev=1`, zie "Huidige stand") is bedoeld om dat straks tegen echte opnames te
+  doen; de pijplijn zelf is intussen wel al end-to-end geverifieerd (bestand inladen, afspelen,
+  scoren, exporteren), maar dan met een ingerenderd bestand van dezelfde Salamander-pianosamples
+  die de app zelf ook gebruikt voor "Speel af", niet met een onafhankelijke opname van een
+  echte microfoon en akoestische piano. Dat laatste moet nog gebeuren voordat de drempelwaarden
+  er echt op afgesteld kunnen worden.
 - iPhone-liggend (landscape, lage viewport): de notenbalk is vergroot op verzoek
   (`min(48vh, 250px)`, was `min(42vh, 220px)`), maar de pagina was daar al wat hoger dan het
   scherm vóór die vergroting; nu moet je iets meer scrollen om de hele kaart te zien. Geen
@@ -273,7 +303,9 @@ Beginners eerst. Latere doelen: liedjes uit Spotify als wensenlijst met voortgan
 - Zoekkaart: IMSLP laat soms een "bevestig dat je geen bot bent"-pagina zien in plaats van direct de zoekresultaten. Dat is IMSLP's eigen bot-bescherming, geen fout in de app.
 
 ## Mogelijke volgende stappen
-1. Testen op telefoon en laptop. Timing-venster en detectiedrempels afstellen.
+1. Testen op telefoon en laptop. Timing-venster en detectiedrempels afstellen: neem daarvoor
+   echte opnames op (een akoestische piano, met een echte microfoon) en speel ze af via de
+   dev-testmodus (`?dev=1`, zie "Huidige stand") om een testdatabase op te bouwen.
 2. Voortgang opslaan in localStorage.
 3. Linkerhand ook kunnen oefenen (niet alleen tonen): bijvoorbeeld een handkeuze naast Niveau,
    die bepaalt welke hand de microfoon beoordeelt. Akkoorden bij de rechterhand worden inmiddels

@@ -532,6 +532,19 @@
       </div>
     </div>
 
+    <div class="controlGroup" id="devTestGroup" hidden>
+      <span class="groupLabel">Dev: herkenning afstellen tegen een opname</span>
+      <div class="groupRow">
+        <input type="file" id="testAudioFile" accept="audio/*">
+      </div>
+      <div class="groupRow">
+        <span class="pill" id="testAudioStatus">Kies een audiobestand van een echte piano-opname.</span>
+      </div>
+      <div class="groupRow">
+        <button type="button" id="exportTestResultBtn" class="btn-ghost" disabled>Resultaat exporteren (JSON)</button>
+      </div>
+    </div>
+
     <div class="controlGroup">
       <span class="groupLabel">Afspelen</span>
       <label class="soundToggle" for="soundToggle"><input type="checkbox" id="soundToggle"> Met geluid</label>
@@ -1503,6 +1516,13 @@ function onHeard(heard, tEvent) {
   const pitchOk = targetMidis.every(tm => heardMidis.some(hm => matchOne(tm, hm)));
   const exactOctave = targetMidis.every(tm => heardMidis.includes(tm));
 
+  // Dev-testmodus (zie startTestAudioMic): log elke beoordeling, ook een foute, voor de
+  // test-database/export. Normaal (echte microfoon) gebeurt dit niet: noteResults houdt
+  // dan al bij wat nodig is, dit logje is puur voor het afstellen van de herkenning.
+  if (testAudioMode) {
+    testDiagnosticsLog.push({ idx, target: target.label, heard: heardLabel, pitchOk, tMs: Math.round(performance.now()) });
+  }
+
   // Oefenmodus: alleen de juiste toon telt, geen tijd.
   if (!playing) {
     if (pitchOk) {
@@ -1972,6 +1992,63 @@ function stopPlay(completed) {
 let audioCtx = null, analyser = null, buf = null, micOn = false, listenTimer = null;
 let calibrationOffset = 0; // afwijking in halve tonen t.o.v. A4 = 440 Hz, bepaald via "Stem af op C"
 
+// ---------- Dev-testmodus: herkenning afstellen tegen een opgenomen audiobestand ----------
+// In plaats van een live microfoon speelt dit een opgenomen audiobestand af door precies
+// dezelfde analysers (zie wireAnalysersTo/listen) als bij een echte microfoon. idx/noteResults
+// lopen dan gewoon mee via de bestaande "Speel af" (zet "Met geluid" uit, anders klinkt de
+// synthetische pianoklank boven op de opname). Alleen zichtbaar met ?dev=1 in de URL: dit is
+// bedoeld om de drempelwaarden in detectPitch/detectPitchYIN/detectChordMatch af te stellen
+// tegen een opbouwende "testdatabase" van echte opnames, niet voor gewone gebruikers.
+let testAudioMode = false;
+let testDiagnosticsLog = []; // zie onHeard(): elke beoordeling tijdens testmodus, goed of fout
+
+async function startTestAudioMic(file) {
+  if (micOn) { setFeedback('Herlaad de pagina om een nieuw testbestand te laden (de microfoon kan maar één keer per sessie aan, net als bij een echte microfoon).', 'bad'); return; }
+  ensureAudioCtx();
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  const src = audioCtx.createBufferSource();
+  src.buffer = audioBuffer;
+  wireAnalysersTo(src);
+  src.connect(audioCtx.destination); // hoorbaar, handig om te controleren of het juiste bestand speelt
+  testAudioMode = true;
+  testDiagnosticsLog = [];
+  micOn = true; // de rest van de app (listen(), UI) behandelt dit verder als "microfoon aan"
+  const micBtnEl = document.getElementById('micBtn');
+  micBtnEl.classList.add('is-on');
+  micBtnEl.classList.remove('micOffHint');
+  setIconLabel(micBtnEl, 'Testbestand speelt af');
+  const statusEl = document.getElementById('testAudioStatus');
+  statusEl.textContent = `Speelt af: ${file.name} (${audioBuffer.duration.toFixed(1)}s). Klik nu op "Speel af" (zonder geluid) om mee te laten scoren.`;
+  resetNoteDetection();
+  listenTimer = listenTimer || setInterval(listen, 60);
+  src.start();
+  src.onended = () => {
+    statusEl.textContent = `Klaar met afspelen: ${file.name}. Resultaat kan nu geëxporteerd worden.`;
+    document.getElementById('exportTestResultBtn').disabled = false;
+  };
+}
+
+// Dumpt noteResults (per noot-index 'hit'/'missed', zoals de echte notenbalk-kleuring ze
+// gebruikt) plus het volledige beoordelingslogje (ook de foute pogingen, met wat er precies
+// gehoord werd) als downloadbaar JSON-bestand: één item voor de groeiende testdatabase.
+function exportTestResult(filename) {
+  const report = {
+    bestand: filename,
+    lied: song ? song.title : null,
+    niveau: document.getElementById('difficulty').value,
+    geexporteerdOp: new Date().toISOString(),
+    noteResults,
+    beoordelingen: testDiagnosticsLog,
+  };
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pianotest-${filename.replace(/\.[^.]+$/, '')}-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function micErrorText(err) {
   switch (err.name) {
     case 'NotAllowedError':
@@ -2001,6 +2078,34 @@ function ensureAudioCtx() {
   return audioCtx;
 }
 
+// Zet de twee analysers (monofoon + akkoord, zie listen()/detectChordMatch) op een
+// willekeurige audiobron: een live microfoonstream (startMic) of, in testmodus
+// (zie startTestAudioMic), een afgespeeld audiobestand. Zo draait de testmodus
+// exact dezelfde herkenning als een echte microfoon, geen aparte testversie van de
+// detectie die uit de pas kan gaan lopen met de echte.
+function wireAnalysersTo(src) {
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  src.connect(analyser);
+  buf = new Float32Array(analyser.fftSize);
+  // Losse, grotere analyser voor akkoordherkenning (zie detectChordMatch): die werkt
+  // in het frequentiedomein en wil juist een hogere frequentieresolutie (een langer
+  // venster), terwijl de twee monofone detectoren hierboven bewust een kort venster
+  // willen voor snelle, nauwkeurige periodedetectie van één toon. Dezelfde bron (src)
+  // kan beide analysers voeden.
+  chordAnalyser = audioCtx.createAnalyser();
+  chordAnalyser.fftSize = CHORD_FFT_SIZE;
+  // Geen tijd-smoothing (standaard 0.8): dat middelt een reeks metingen in de tijd,
+  // wat de piekniveaus van een net gespeeld akkoord kunstmatig verzwakt, vooral
+  // vlak na het begin van een analyser (of een nieuwe toon) als het nog over een
+  // grotendeels stille voorgeschiedenis middelt. We willen juist steeds het echte
+  // niveau van dít moment, CONFIRM_MS/detectChordMatch doet de stabiliteitscontrole
+  // zelf al over de tijd.
+  chordAnalyser.smoothingTimeConstant = 0;
+  src.connect(chordAnalyser);
+  chordFreqData = new Float32Array(chordAnalyser.frequencyBinCount);
+}
+
 async function startMic() {
   if (micOn) return true;
   try {
@@ -2009,26 +2114,7 @@ async function startMic() {
     });
     ensureAudioCtx();
     const src = audioCtx.createMediaStreamSource(stream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    src.connect(analyser);
-    buf = new Float32Array(analyser.fftSize);
-    // Losse, grotere analyser voor akkoordherkenning (zie detectChordMatch): die werkt
-    // in het frequentiedomein en wil juist een hogere frequentieresolutie (een langer
-    // venster), terwijl de twee monofone detectoren hierboven bewust een kort venster
-    // willen voor snelle, nauwkeurige periodedetectie van één toon. Dezelfde bron (src)
-    // kan beide analysers voeden.
-    chordAnalyser = audioCtx.createAnalyser();
-    chordAnalyser.fftSize = CHORD_FFT_SIZE;
-    // Geen tijd-smoothing (standaard 0.8): dat middelt een reeks metingen in de tijd,
-    // wat de piekniveaus van een net gespeeld akkoord kunstmatig verzwakt, vooral
-    // vlak na het begin van een analyser (of een nieuwe toon) als het nog over een
-    // grotendeels stille voorgeschiedenis middelt. We willen juist steeds het echte
-    // niveau van dít moment, CONFIRM_MS/detectChordMatch doet de stabiliteitscontrole
-    // zelf al over de tijd.
-    chordAnalyser.smoothingTimeConstant = 0;
-    src.connect(chordAnalyser);
-    chordFreqData = new Float32Array(chordAnalyser.frequencyBinCount);
+    wireAnalysersTo(src);
     micOn = true;
     const micBtnEl = document.getElementById('micBtn');
     micBtnEl.classList.add('is-on');
@@ -2921,6 +3007,23 @@ document.getElementById('micBtn').addEventListener('click', async () => {
     setFeedback('Luisteren... speel de eerste noot, of druk op Speel af.', '');
     render();
   }
+});
+
+// Dev-testmodus (zie startTestAudioMic/exportTestResult hierboven): alleen zichtbaar met
+// ?dev=1 in de URL, bedoeld om de drempelwaarden van de herkenning af te stellen tegen
+// opgenomen audio, niet voor gewone gebruikers.
+if (new URLSearchParams(location.search).has('dev')) {
+  document.getElementById('devTestGroup').hidden = false;
+}
+document.getElementById('testAudioFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  await startTestAudioMic(file);
+  render();
+});
+document.getElementById('exportTestResultBtn').addEventListener('click', () => {
+  const file = document.getElementById('testAudioFile').files[0];
+  exportTestResult(file ? file.name : 'onbekend');
 });
 
 // Op een noot tikken laat 'm horen: handig om te weten hoe de toon klinkt
